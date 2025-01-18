@@ -1,7 +1,11 @@
--- Drop existing invitation policies
+-- Drop ALL existing invitation policies
 DROP POLICY IF EXISTS "Organization admins can view invitations" ON invitations;
 DROP POLICY IF EXISTS "Organization admins can create invitations" ON invitations;
 DROP POLICY IF EXISTS "Organization admins can update invitations" ON invitations;
+DROP POLICY IF EXISTS "Enable insert for authenticated users" ON invitations;
+DROP POLICY IF EXISTS "Enable select for authenticated users" ON invitations;
+DROP POLICY IF EXISTS "Enable update for authenticated users" ON invitations;
+DROP POLICY IF EXISTS "Enable delete for authenticated users" ON invitations;
 
 -- Create more permissive policies for invitations
 CREATE POLICY "Enable insert for authenticated users"
@@ -16,6 +20,12 @@ CREATE POLICY "Enable select for authenticated users"
 
 CREATE POLICY "Enable update for authenticated users"
     ON invitations FOR UPDATE
+    TO authenticated
+    USING (true);
+
+-- Add DELETE policy for invitations
+CREATE POLICY "Enable delete for authenticated users"
+    ON invitations FOR DELETE
     TO authenticated
     USING (true);
 

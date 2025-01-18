@@ -71,23 +71,12 @@ export default function Users() {
 
   const handleDeleteInvitation = async (invitationId) => {
     try {
-      setError(null) // Clear any existing errors
+      setError(null)
       const { error } = await deleteInvitation(invitationId)
-      if (error) {
-        console.error('Error deleting invitation:', error)
-        setError(error.message || 'Failed to delete invitation')
-        return
-      }
+      if (error) throw error
 
-      // Show success message (assuming you have a toast or alert system)
-      const successMessage = document.createElement('div')
-      successMessage.className = 'alert alert-success mt-4'
-      successMessage.textContent = 'Invitation deleted successfully'
-      document.querySelector('.mx-auto.max-w-7xl').prepend(successMessage)
-      setTimeout(() => successMessage.remove(), 3000)
-
-      // Reload data to update the list
-      await loadData()
+      // If successful, update the invitations list by filtering out the deleted one
+      setInvitations(current => current.filter(inv => inv.id !== invitationId))
     } catch (error) {
       console.error('Error deleting invitation:', error)
       setError(error.message || 'Failed to delete invitation')

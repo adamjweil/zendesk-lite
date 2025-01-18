@@ -3,22 +3,21 @@ import { nanoid } from 'nanoid'
 
 // User profile operations
 export const getUserProfile = async (userId) => {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select(`
-        *,
-        organization:organizations(*)
-      `)
-      .eq('id', userId)
-      .maybeSingle()
+  const { data, error } = await supabase
+    .from('profiles')
+    .select(`
+      *,
+      organization:organizations(
+        id,
+        name,
+        website,
+        description
+      )
+    `)
+    .eq('id', userId)
+    .single()
 
-    if (error) throw error
-    return { data, error: null }
-  } catch (error) {
-    console.error('Error fetching user profile:', error)
-    return { data: null, error }
-  }
+  return { data, error }
 }
 
 export const updateUserProfile = async (userId, updates) => {
@@ -69,21 +68,18 @@ export const getOrganizationUsers = async () => {
   }
 }
 
-export const updateOrganization = async (orgId, updates) => {
-  try {
-    const { data, error } = await supabase
-      .from('organizations')
-      .update(updates)
-      .eq('id', orgId)
-      .select()
-      .single()
+export const updateOrganization = async (organizationId, formData) => {
+  const { data, error } = await supabase
+    .from('organizations')
+    .update({
+      name: formData.name,
+      website: formData.website || null,  // Use null if empty
+      description: formData.description || null,  // Use null if empty
+    })
+    .eq('id', organizationId)
+    .select()
 
-    if (error) throw error
-    return { data, error: null }
-  } catch (error) {
-    console.error('Error updating organization:', error)
-    return { data: null, error }
-  }
+  return { data, error }
 }
 
 // Invitation operations
