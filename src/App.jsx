@@ -8,6 +8,7 @@ import Register from './pages/Register'
 import Profile from './pages/Profile'
 import Users from './pages/Users'
 import AcceptInvitation from './pages/AcceptInvitation'
+import OrganizationSettings from './pages/OrganizationSettings'
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
             <Route path="tickets" element={<div>Tickets coming soon...</div>} />
             <Route path="knowledge-base" element={<div>Knowledge Base coming soon...</div>} />
             <Route path="reports" element={<div>Reports coming soon...</div>} />
+            <Route path="organization/settings" element={<OrganizationSettings />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
