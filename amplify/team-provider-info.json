@@ -1,0 +1,23 @@
+{
+  "dev": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-zendesklite-dev-e56b2-authRole",
+      "UnauthRoleArn": "arn:aws:iam::474668398195:role/amplify-zendesklite-dev-e56b2-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::474668398195:role/amplify-zendesklite-dev-e56b2-authRole",
+      "Region": "us-west-1",
+      "DeploymentBucketName": "amplify-zendesklite-dev-e56b2-deployment",
+      "UnauthRoleName": "amplify-zendesklite-dev-e56b2-unauthRole",
+      "StackName": "amplify-zendesklite-dev-e56b2",
+      "StackId": "arn:aws:cloudformation:us-west-1:474668398195:stack/amplify-zendesklite-dev-e56b2/c11a05f0-d684-11ef-a77c-066808d1a3af",
+      "AmplifyAppId": "d1fpyq3kl9bfn7"
+    },
+    "categories": {
+      "hosting": {
+        "amplifyhosting": {
+          "appId": "d1fpyq3kl9bfn7",
+          "type": "manual"
+        }
+      }
+    }
+  }
+}
