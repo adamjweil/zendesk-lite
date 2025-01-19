@@ -43,22 +43,8 @@ export const updateUserProfile = async (userId, updates) => {
 // Organization operations
 export const getOrganizationUsers = async () => {
   try {
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('organization_id')
-      .eq('id', (await supabase.auth.getUser()).data.user?.id)
-      .single()
-
-    if (profileError) throw profileError
-
     const { data, error } = await supabase
-      .from('profiles')
-      .select(`
-        *,
-        organization:organizations(*)
-      `)
-      .eq('organization_id', profile.organization_id)
-      .order('created_at', { ascending: false })
+      .rpc('get_organization_users')
 
     if (error) throw error
     return { data, error: null }
@@ -322,5 +308,187 @@ export const createComment = async (commentData) => {
   } catch (error) {
     console.error('Error creating comment:', error)
     return { data: null, error }
+  }
+}
+
+// Check if current user is admin
+export const isCurrentUserAdmin = async () => {
+  try {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', (await supabase.auth.getUser()).data.user?.id)
+      .single()
+
+    if (error) throw error
+    return profile?.role === 'admin'
+  } catch (error) {
+    console.error('Error checking admin status:', error)
+    return false
+  }
+}
+
+// Update user role
+export const updateUserRole = async (userId, role) => {
+  try {
+    // First verify the current user is an admin
+    const isAdmin = await isCurrentUserAdmin()
+    if (!isAdmin) {
+      throw new Error('Only admins can update user roles')
+    }
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ role })
+      .eq('id', userId)
+      .select()
+      .single()
+
+    if (error) throw error
+    return { data, error: null }
+  } catch (error) {
+    console.error('Error updating user role:', error)
+    return { data: null, error }
+  }
+}
+
+// Recent Activity operations
+export const getRecentActivities = async (page = 1, pageSize = 10) => {
+  try {
+    const offset = (page - 1) * pageSize
+
+    // Get recent tickets and comments in parallel
+    const [ticketsResponse, commentsResponse] = await Promise.all([
+      supabase
+        .from('tickets')
+        .select(`
+          id,
+          subject,
+          status,
+          created_at,
+          creator:profiles!tickets_creator_id_fkey(id, full_name),
+          assignee:profiles!tickets_assignee_id_fkey(id, full_name)
+        `)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + pageSize - 1),
+      supabase
+        .from('comments')
+        .select(`
+          id,
+          content,
+          is_internal,
+          created_at,
+          ticket_id,
+          author:profiles!comments_author_id_fkey(id, full_name),
+          ticket:tickets!comments_ticket_id_fkey(subject)
+        `)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + pageSize - 1)
+    ])
+
+    console.log('Tickets response:', ticketsResponse)
+    console.log('Comments response:', commentsResponse)
+
+    if (ticketsResponse.error) throw ticketsResponse.error
+    if (commentsResponse.error) throw commentsResponse.error
+
+    // Get total counts for pagination
+    const [{ count: ticketsCount }, { count: commentsCount }] = await Promise.all([
+      supabase.from('tickets').select('*', { count: 'exact', head: true }),
+      supabase.from('comments').select('*', { count: 'exact', head: true })
+    ])
+
+    console.log('Tickets count:', ticketsCount)
+    console.log('Comments count:', commentsCount)
+
+    const totalTickets = ticketsCount || 0
+    const totalComments = commentsCount || 0
+    const totalItems = totalTickets + totalComments
+
+    // Combine and sort activities
+    const activities = [
+      ...(ticketsResponse.data || []).map(ticket => ({
+        id: `ticket-${ticket.id}`,
+        type: 'ticket_created',
+        ticket_id: ticket.id,
+        subject: ticket.subject,
+        status: ticket.status,
+        actor: ticket.creator?.full_name,
+        assignee: ticket.assignee?.full_name,
+        created_at: ticket.created_at
+      })),
+      ...(commentsResponse.data || []).map(comment => ({
+        id: `comment-${comment.id}`,
+        type: 'comment_added',
+        ticket_id: comment.ticket_id,
+        subject: comment.ticket?.subject,
+        content: comment.content,
+        is_internal: comment.is_internal,
+        actor: comment.author?.full_name,
+        created_at: comment.created_at
+      }))
+    ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, pageSize)
+
+    console.log('Combined activities:', activities)
+
+    return { 
+      data: activities, 
+      metadata: {
+        currentPage: page,
+        pageSize,
+        totalPages: Math.ceil(totalItems / pageSize),
+        totalItems
+      }, 
+      error: null 
+    }
+  } catch (error) {
+    console.error('Error fetching recent activities:', error)
+    return { data: null, metadata: null, error }
+  }
+}
+
+// Test data creation (temporary)
+export const createTestData = async () => {
+  try {
+    // Get the current user's ID
+    const userId = (await supabase.auth.getUser()).data.user?.id
+    if (!userId) throw new Error('No user logged in')
+
+    // Create a test ticket
+    const { data: ticket, error: ticketError } = await supabase
+      .from('tickets')
+      .insert([{
+        subject: 'Test Ticket',
+        description: 'This is a test ticket',
+        status: 'new',
+        priority: 'medium',
+        creator_id: userId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }])
+      .select()
+      .single()
+
+    if (ticketError) throw ticketError
+
+    // Create a test comment
+    const { error: commentError } = await supabase
+      .from('comments')
+      .insert([{
+        ticket_id: ticket.id,
+        author_id: userId,
+        content: 'This is a test comment',
+        is_internal: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }])
+
+    if (commentError) throw commentError
+
+    return { error: null }
+  } catch (error) {
+    console.error('Error creating test data:', error)
+    return { error }
   }
 } 
