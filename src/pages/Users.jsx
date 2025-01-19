@@ -1,7 +1,21 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { getOrganizationUsers, getInvitations, createInvitation, deleteInvitation } from '../lib/database'
-import { UserPlus, Mail, Clock, Trash2 } from 'lucide-react'
+import { getOrganizationUsers, getInvitations, createInvitation, deleteInvitation, updateUserRole, isCurrentUserAdmin } from '../lib/database'
+import { UserPlus, Mail, Clock, Trash2, UserCog } from 'lucide-react'
+
+// Role badge color mapping
+const getRoleBadgeColors = (role) => {
+  switch (role) {
+    case 'admin':
+      return 'bg-red-100 text-red-800'
+    case 'agent':
+      return 'bg-blue-100 text-blue-800'
+    case 'customer':
+      return 'bg-green-100 text-green-800'
+    default:
+      return 'bg-primary/10 text-primary'
+  }
+}
 
 export default function Users() {
   const { user } = useAuth()
@@ -10,7 +24,11 @@ export default function Users() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [showInviteModal, setShowInviteModal] = useState(false)
+  const [showUserModal, setShowUserModal] = useState(false)
+  const [selectedUser, setSelectedUser] = useState(null)
   const [inviting, setInviting] = useState(false)
+  const [updating, setUpdating] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [inviteForm, setInviteForm] = useState({
     email: '',
     role: 'agent',
@@ -18,7 +36,13 @@ export default function Users() {
 
   useEffect(() => {
     loadData()
+    checkAdminStatus()
   }, [])
+
+  const checkAdminStatus = async () => {
+    const adminStatus = await isCurrentUserAdmin()
+    setIsAdmin(adminStatus)
+  }
 
   const loadData = async () => {
     try {
@@ -83,6 +107,44 @@ export default function Users() {
     }
   }
 
+  const handleUserClick = (user) => {
+    if (isAdmin) {
+      setSelectedUser(user)
+      setShowUserModal(true)
+    }
+  }
+
+  const handleUpdateRole = async (e) => {
+    e.preventDefault()
+    if (!selectedUser) return
+
+    setUpdating(true)
+    setError(null)
+
+    try {
+      const { error } = await updateUserRole(selectedUser.id, e.target.role.value)
+      if (error) throw error
+
+      // Update the users list with the new role
+      setUsers(current =>
+        current.map(u =>
+          u.id === selectedUser.id
+            ? { ...u, role: e.target.role.value }
+            : u
+        )
+      )
+
+      // Close modal
+      setShowUserModal(false)
+      setSelectedUser(null)
+    } catch (error) {
+      console.error('Error updating user role:', error)
+      setError(error.message || 'Failed to update user role')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -119,15 +181,24 @@ export default function Users() {
           <div className="mt-4 overflow-hidden bg-white shadow sm:rounded-lg">
             <ul className="divide-y divide-gray-200">
               {users.map((user) => (
-                <li key={user.id} className="px-6 py-4">
+                <li 
+                  key={user.id} 
+                  className={`px-6 py-4 ${isAdmin ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+                  onClick={() => handleUserClick(user)}
+                >
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium text-gray-900">{user.full_name}</p>
                       <p className="text-sm text-gray-500">{user.email}</p>
                     </div>
-                    <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize bg-primary/10 text-primary">
-                      {user.role}
-                    </span>
+                    <div className="flex items-center space-x-4">
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${getRoleBadgeColors(user.role)}`}>
+                        {user.role}
+                      </span>
+                      {isAdmin && (
+                        <UserCog className="h-4 w-4 text-gray-400" />
+                      )}
+                    </div>
                   </div>
                 </li>
               ))}
@@ -154,7 +225,7 @@ export default function Users() {
                         </p>
                       </div>
                       <div className="flex items-center space-x-4">
-                        <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize bg-primary/10 text-primary">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${getRoleBadgeColors(invitation.role)}`}>
                           {invitation.role}
                         </span>
                         <button
@@ -224,6 +295,65 @@ export default function Users() {
             </form>
           </div>
           <div className="modal-backdrop" onClick={() => setShowInviteModal(false)}></div>
+        </div>
+      )}
+
+      {/* User Details Modal */}
+      {showUserModal && selectedUser && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">User Details</h3>
+            <div className="mt-4">
+              <p className="text-sm text-gray-500">Name</p>
+              <p className="font-medium">{selectedUser.full_name}</p>
+              
+              <p className="text-sm text-gray-500 mt-4">Email</p>
+              <p className="font-medium">{selectedUser.email}</p>
+
+              <form onSubmit={handleUpdateRole} className="mt-4">
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Role</span>
+                  </label>
+                  <select
+                    name="role"
+                    className="select select-bordered"
+                    defaultValue={selectedUser.role}
+                  >
+                    <option value="agent">Agent</option>
+                    <option value="admin">Admin</option>
+                    <option value="customer">Customer</option>
+                  </select>
+                </div>
+                <div className="modal-action">
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => {
+                      setShowUserModal(false)
+                      setSelectedUser(null)
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={updating}
+                  >
+                    {updating ? 'Updating...' : 'Update Role'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+          <div 
+            className="modal-backdrop" 
+            onClick={() => {
+              setShowUserModal(false)
+              setSelectedUser(null)
+            }}
+          ></div>
         </div>
       )}
     </div>
