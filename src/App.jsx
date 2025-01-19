@@ -9,6 +9,8 @@ import Profile from './pages/Profile'
 import Users from './pages/Users'
 import AcceptInvitation from './pages/AcceptInvitation'
 import OrganizationSettings from './pages/OrganizationSettings'
+import Tickets from './pages/Tickets'
+import TicketDetails from './pages/TicketDetails'
 
 function App() {
   return (
@@ -32,7 +34,8 @@ function App() {
             <Route index element={<Dashboard />} />
             <Route path="profile" element={<Profile />} />
             <Route path="users" element={<Users />} />
-            <Route path="tickets" element={<div>Tickets coming soon...</div>} />
+            <Route path="tickets" element={<Tickets />} />
+            <Route path="tickets/:ticketId" element={<TicketDetails />} />
             <Route path="knowledge-base" element={<div>Knowledge Base coming soon...</div>} />
             <Route path="reports" element={<div>Reports coming soon...</div>} />
             <Route path="organization/settings" element={<OrganizationSettings />} />

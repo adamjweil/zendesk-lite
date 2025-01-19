@@ -13,3 +13,16 @@
     @apply h-full;
   }
 }
+
+/* Add these styles for proper table scrolling */
+.overflow-x-auto {
+  height: calc(100vh - 13rem); /* Adjust based on header + filters height */
+  overflow-y: auto;
+}
+
+thead {
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 1;
+}
