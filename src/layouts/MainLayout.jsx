@@ -29,38 +29,7 @@ export default function MainLayout() {
                 {/* Header content can go here */}
               </div>
               
-              {/* User Menu */}
-              <div className="ml-4 flex items-center md:ml-6">
-                <div className="dropdown dropdown-end">
-                  <button
-                    className="btn btn-ghost btn-circle avatar"
-                    tabIndex={0}
-                  >
-                    <div className="w-10 rounded-full bg-primary text-primary-content grid place-items-center">
-                      <span className="text-xl font-bold">
-                        {user?.email?.[0].toUpperCase()}
-                      </span>
-                    </div>
-                  </button>
-                  <ul tabIndex={0} className="mt-3 z-[1] p-2 shadow menu menu-sm dropdown-content bg-base-100 rounded-box w-52">
-                    <li>
-                      <Link to="/profile" className="flex items-center px-4 py-2 text-sm text-gray-700">
-                        <User className="mr-3 h-5 w-5 text-gray-400" />
-                        Profile
-                      </Link>
-                    </li>
-                    <li>
-                      <button
-                        onClick={handleSignOut}
-                        className="flex w-full items-center px-4 py-2 text-sm text-gray-700"
-                      >
-                        <LogOut className="mr-3 h-5 w-5 text-gray-400" />
-                        Sign out
-                      </button>
-                    </li>
-                  </ul>
-                </div>
-              </div>
+         
             </div>
           </div>
 

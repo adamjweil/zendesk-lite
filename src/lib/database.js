@@ -221,62 +221,106 @@ export const deleteInvitation = async (invitationId) => {
 
 // Ticket operations
 export const getTickets = async (filters = {}) => {
-  let query = supabase
-    .from('tickets')
-    .select(`
-      *,
-      assignee:profiles!tickets_assignee_id_fkey(id, full_name),
-      creator:profiles!tickets_creator_id_fkey(id, full_name)
-    `)
+  try {
+    let query = supabase
+      .from('tickets')
+      .select(`
+        *,
+        creator:profiles!tickets_creator_id_fkey(id, full_name),
+        assignee:profiles!tickets_assignee_id_fkey(id, full_name)
+      `)
 
-  // Apply filters
-  if (filters.status) {
-    query = query.eq('status', filters.status)
-  }
-  if (filters.assignee_id) {
-    query = query.eq('assignee_id', filters.assignee_id)
-  }
-  if (filters.creator_id) {
-    query = query.eq('creator_id', filters.creator_id)
-  }
+    // Apply filters
+    if (filters.id) {
+      query = query.eq('id', filters.id)
+    }
+    if (filters.status) {
+      query = query.eq('status', filters.status)
+    }
+    if (filters.assignee_id) {
+      query = query.eq('assignee_id', filters.assignee_id)
+    }
+    if (filters.creator_id) {
+      query = query.eq('creator_id', filters.creator_id)
+    }
 
-  const { data, error } = await query.order('created_at', { ascending: false })
-  return { data, error }
+    const { data, error } = await query.order('created_at', { ascending: false })
+    return { data, error }
+  } catch (error) {
+    console.error('Error fetching tickets:', error)
+    return { data: null, error }
+  }
 }
 
 export const createTicket = async (ticketData) => {
-  const { data, error } = await supabase
-    .from('tickets')
-    .insert([ticketData])
-    .select()
-  return { data, error }
+  try {
+    const { data, error } = await supabase
+      .from('tickets')
+      .insert([{
+        ...ticketData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }])
+      .select()
+
+    return { data, error }
+  } catch (error) {
+    console.error('Error creating ticket:', error)
+    return { data: null, error }
+  }
 }
 
 export const updateTicket = async (ticketId, updates) => {
-  const { data, error } = await supabase
-    .from('tickets')
-    .update(updates)
-    .eq('id', ticketId)
-    .select()
-  return { data, error }
+  try {
+    const { data, error } = await supabase
+      .from('tickets')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', ticketId)
+      .select()
+
+    return { data, error }
+  } catch (error) {
+    console.error('Error updating ticket:', error)
+    return { data: null, error }
+  }
 }
 
 // Comments operations
 export const getTicketComments = async (ticketId) => {
-  const { data, error } = await supabase
-    .from('comments')
-    .select(`      *,
-      author:profiles!comments_author_id_fkey(id, full_name)
-    `)
-    .eq('ticket_id', ticketId)
-    .order('created_at', { ascending: true })
-  return { data, error }
+  try {
+    const { data, error } = await supabase
+      .from('comments')
+      .select(`
+        *,
+        author:profiles!comments_author_id_fkey(id, full_name)
+      `)
+      .eq('ticket_id', ticketId)
+      .order('created_at', { ascending: true })
+
+    return { data, error }
+  } catch (error) {
+    console.error('Error fetching ticket comments:', error)
+    return { data: null, error }
+  }
 }
 
 export const createComment = async (commentData) => {
-  const { data, error } = await supabase
-    .from('comments')
-    .insert([commentData])
-    .select()
-  return { data, error }
+  try {
+    const { data, error } = await supabase
+      .from('comments')
+      .insert([{
+        ...commentData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }])
+      .select()
+
+    return { data, error }
+  } catch (error) {
+    console.error('Error creating comment:', error)
+    return { data: null, error }
+  }
 } 
