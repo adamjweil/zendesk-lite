@@ -11,7 +11,8 @@ export const getUserProfile = async (userId) => {
         id,
         name,
         website,
-        description
+        description,
+        support_email
       )
     `)
     .eq('id', userId)
@@ -61,11 +62,64 @@ export const updateOrganization = async (organizationId, formData) => {
       name: formData.name,
       website: formData.website || null,  // Use null if empty
       description: formData.description || null,  // Use null if empty
+      support_email: formData.support_email || null,  // Use null if empty
     })
     .eq('id', organizationId)
     .select()
 
   return { data, error }
+}
+
+export const deleteSupportEmail = async (organizationId) => {
+  try {
+    const { data, error } = await supabase
+      .from('organizations')
+      .update({ support_email: null })
+      .eq('id', organizationId)
+      .select()
+      .single()
+
+    if (error) throw error
+    return { data, error: null }
+  } catch (error) {
+    console.error('Error deleting support email:', error)
+    return { data: null, error }
+  }
+}
+
+export const generateSupportEmail = async (organizationId) => {
+  try {
+    // Get organization details
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('name')
+      .eq('id', organizationId)
+      .single()
+
+    if (!org) throw new Error('Organization not found')
+
+    // Generate a unique support email based on organization name
+    const baseEmail = org.name.toLowerCase()
+      .replace(/[^a-z0-9]/g, '') // Remove special characters
+      .slice(0, 20) // Limit length
+    
+    const uniqueId = Math.random().toString(36).substring(2, 7)
+    const supportEmail = `${baseEmail}-${uniqueId}@support.zendesklite.com`
+
+    // Update the organization with the new support email
+    const { data, error } = await supabase
+      .from('organizations')
+      .update({ support_email: supportEmail })
+      .eq('id', organizationId)
+      .select()
+      .single()
+
+    if (error) throw error
+    return { data, error: null }
+  } catch (error) {
+    console.error('Error generating support email:', error)
+    return { data: null, error }
+  }
 }
 
 // Invitation operations
