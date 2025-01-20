@@ -35,6 +35,17 @@ CREATE TABLE comments (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
+-- Create organizations table
+CREATE TABLE organizations (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    name TEXT NOT NULL,
+    website TEXT,
+    description TEXT,
+    support_email TEXT UNIQUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
 -- Create RLS policies
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tickets ENABLE ROW LEVEL SECURITY;

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { getTickets, updateTicket, getTicketComments, createComment } from '../lib/database'
+import { getTickets, updateTicket, getTicketComments, createComment, getOrganizationUsers } from '../lib/database'
 import { MessageSquare, Clock, AlertCircle } from 'lucide-react'
 
 export default function TicketDetails() {
@@ -13,10 +13,21 @@ export default function TicketDetails() {
   const [loading, setLoading] = useState(true)
   const [newComment, setNewComment] = useState('')
   const [isInternalNote, setIsInternalNote] = useState(false)
+  const [organizationUsers, setOrganizationUsers] = useState([])
 
   useEffect(() => {
     loadTicketDetails()
+    loadOrganizationUsers()
   }, [ticketId])
+
+  const loadOrganizationUsers = async () => {
+    const { data, error } = await getOrganizationUsers()
+    if (error) {
+      console.error('Error loading organization users:', error)
+    } else {
+      setOrganizationUsers(data || [])
+    }
+  }
 
   const loadTicketDetails = async () => {
     setLoading(true)
@@ -78,6 +89,12 @@ export default function TicketDetails() {
     }
   }
 
+  useEffect(() => {
+    if (ticket) {
+      console.log('Selected ticket:', ticket)
+    }
+  }, [ticket])
+
   if (loading) {
     return <div className="p-4">Loading ticket details...</div>
   }
@@ -124,7 +141,13 @@ export default function TicketDetails() {
               className="inline-flex justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
             >
               <option value="">Unassigned</option>
-              {/* TODO: Add list of available agents */}
+              {organizationUsers
+                .filter(user => ['admin', 'agent'].includes(user.role))
+                .map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.full_name}
+                  </option>
+              ))}
             </select>
           </div>
         </div>

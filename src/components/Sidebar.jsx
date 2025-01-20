@@ -34,12 +34,12 @@ export default function Sidebar() {
       icon: Ticket,
       current: location.pathname === '/tickets',
     },
-    {
-      name: 'Users',
-      href: '/users',
-      icon: Users,
-      current: location.pathname === '/users',
-    },
+    // {
+    //   name: 'Users',
+    //   href: '/users',
+    //   icon: Users,
+    //   current: location.pathname === '/users',
+    // },
     {
       name: 'Profile',
       href: '/profile',
@@ -48,7 +48,7 @@ export default function Sidebar() {
     },
     // Only show organization settings to admins
     ...(isAdmin ? [{
-      name: 'Organization Settings',
+      name: 'Organization',
       href: '/organization/settings',
       icon: Building,
       current: location.pathname === '/organization/settings',

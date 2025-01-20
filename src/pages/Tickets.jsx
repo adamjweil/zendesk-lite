@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Plus, Filter, Search, Calendar, User, X, MessageSquare, Clock, AlertCircle } from 'lucide-react'
-import { getTickets, createTicket, getTicketComments, updateTicket, createComment, getTags, getTagsForTicket, addTagToTicket, removeTagFromTicket } from '../lib/database'
+import { getTickets, createTicket, getTicketComments, updateTicket, createComment, getTags, getTagsForTicket, addTagToTicket, removeTagFromTicket, getOrganizationUsers } from '../lib/database'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function Tickets() {
@@ -27,10 +27,12 @@ export default function Tickets() {
   const [selectedTags, setSelectedTags] = useState([])
   const [statusFilter, setStatusFilter] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('')
+  const [organizationUsers, setOrganizationUsers] = useState([])
 
   useEffect(() => {
     loadTickets()
     loadAvailableTags()
+    loadOrganizationUsers()
   }, [])
 
   useEffect(() => {
@@ -98,7 +100,17 @@ export default function Tickets() {
     }
   }
 
+  const loadOrganizationUsers = async () => {
+    const { data, error } = await getOrganizationUsers()
+    if (error) {
+      console.error('Error loading organization users:', error)
+    } else {
+      setOrganizationUsers(data || [])
+    }
+  }
+
   const handleTicketClick = (ticket) => {
+    console.log('Ticket data in table:', ticket);
     setSelectedTicket(ticket)
     setShowTicketDetailsModal(true)
   }
@@ -109,6 +121,15 @@ export default function Tickets() {
       console.error('Error updating ticket status:', error)
     } else {
       setSelectedTicket({ ...selectedTicket, status: newStatus })
+      loadTickets() // Refresh the list
+    }
+  }
+
+  const handleAssigneeChange = async (ticketId, newAssigneeId) => {
+    const { error } = await updateTicket(ticketId, { assignee_id: newAssigneeId })
+    if (error) {
+      console.error('Error updating ticket assignee:', error)
+    } else {
       loadTickets() // Refresh the list
     }
   }
@@ -269,6 +290,9 @@ export default function Tickets() {
                         Created By
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Assigned To
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Created At
                       </th>
                     </tr>
@@ -316,6 +340,11 @@ export default function Tickets() {
                               <div className="text-sm text-gray-900">
                                 {ticket.creator?.full_name}
                               </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {ticket.assignee?.full_name || 'Unassigned'}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -377,6 +406,20 @@ export default function Tickets() {
                         <option value="pending">Pending</option>
                         <option value="resolved">Resolved</option>
                         <option value="closed">Closed</option>
+                      </select>
+                      <select
+                        value={selectedTicket.assignee_id || ''}
+                        onChange={(e) => handleAssigneeChange(selectedTicket.id, e.target.value)}
+                        className="inline-flex justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                      >
+                        <option value="">Unassigned</option>
+                        {organizationUsers
+                          .filter(user => ['admin', 'agent'].includes(user.role))
+                          .map((user) => (
+                            <option key={user.id} value={user.id}>
+                              {user.full_name}
+                            </option>
+                      ))}
                       </select>
                       <span className={`inline-flex items-center px-3 py-2 rounded-md text-sm font-medium ${priorityColors[selectedTicket.priority]}`}>
                         {selectedTicket.priority}
