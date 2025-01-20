@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { getUserProfile, updateOrganization } from '../lib/database'
+import { getUserProfile, updateOrganization, getTags, createTag, updateTag, deleteTag } from '../lib/database'
 import { Building } from 'lucide-react'
 
 export default function OrganizationSettings() {
@@ -16,9 +16,13 @@ export default function OrganizationSettings() {
     website: '',
     description: '',
   })
+  const [tags, setTags] = useState([])
+  const [newTag, setNewTag] = useState({ name: '', description: '' })
+  const [showNewTagForm, setShowNewTagForm] = useState(false)
 
   useEffect(() => {
     loadOrganization()
+    loadTags()
   }, [])
 
   const loadOrganization = async () => {
@@ -47,6 +51,15 @@ export default function OrganizationSettings() {
     }
   }
 
+  const loadTags = async () => {
+    const { data, error } = await getTags()
+    if (error) {
+      console.error('Error loading tags:', error)
+    } else {
+      setTags(data || [])
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setSaving(true)
@@ -70,6 +83,35 @@ export default function OrganizationSettings() {
       setError('Failed to update organization settings')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleCreateTag = async (e) => {
+    e.preventDefault()
+    const { error } = await createTag(newTag)
+    if (error) {
+      console.error('Error creating tag:', error)
+    } else {
+      setNewTag({ name: '', description: '' })
+      loadTags()
+    }
+  }
+
+  const handleUpdateTag = async (tagId, updates) => {
+    const { error } = await updateTag(tagId, updates)
+    if (error) {
+      console.error('Error updating tag:', error)
+    } else {
+      loadTags()
+    }
+  }
+
+  const handleDeleteTag = async (tagId) => {
+    const { error } = await deleteTag(tagId)
+    if (error) {
+      console.error('Error deleting tag:', error)
+    } else {
+      loadTags()
     }
   }
 
@@ -152,6 +194,70 @@ export default function OrganizationSettings() {
             </button>
           </div>
         </form>
+
+        <div className="mt-8">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold text-gray-900">Manage Tags</h2>
+            <button
+              onClick={() => setShowNewTagForm(!showNewTagForm)}
+              className="btn btn-sm btn-primary"
+            >
+              {showNewTagForm ? 'Cancel' : '+ Add Tag'}
+            </button>
+          </div>
+
+          {showNewTagForm && (
+            <form onSubmit={handleCreateTag} className="mt-4 space-y-4">
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text">Tag Name</span>
+                </label>
+                <input
+                  type="text"
+                  className="input input-bordered"
+                  value={newTag.name}
+                  onChange={(e) => setNewTag({ ...newTag, name: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text">Description</span>
+                </label>
+                <textarea
+                  className="textarea textarea-bordered h-24"
+                  value={newTag.description}
+                  onChange={(e) => setNewTag({ ...newTag, description: e.target.value })}
+                />
+              </div>
+              <div className="flex justify-end">
+                <button type="submit" className="btn btn-primary">Add Tag</button>
+                <button
+                  type="button"
+                  onClick={() => setShowNewTagForm(false)}
+                  className="btn btn-secondary ml-2"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+
+          <ul className="mt-4">
+            {tags.map((tag) => (
+              <li key={tag.id} className="flex justify-between items-center py-2">
+                <div>
+                  <span className="font-semibold">{tag.name}</span>
+                  <span className="text-gray-600 ml-2">- {tag.description}</span>
+                </div>
+                <div className="flex space-x-2">
+                  <button onClick={() => handleUpdateTag(tag.id, { name: 'Updated Name' })} className="btn btn-sm">Edit</button>
+                  <button onClick={() => handleDeleteTag(tag.id)} className="btn btn-sm btn-error">Delete</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   )
