@@ -229,7 +229,7 @@ export default function Tickets() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50 sticky top-0 z-10">
                     <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">
                         <div className="relative">
                           <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                           <select
@@ -249,7 +249,7 @@ export default function Tickets() {
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Title
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">
                         <div className="relative">
                           <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
                           <select

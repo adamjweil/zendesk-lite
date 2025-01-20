@@ -154,15 +154,15 @@ export default function Users() {
   }
 
   return (
-    <div className="py-6">
+    <div className="py-4">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-semibold text-gray-900">Users</h1>
+          <h1 className="text-xl font-semibold text-gray-900">Users</h1>
           <button
             onClick={() => setShowInviteModal(true)}
-            className="btn btn-primary"
+            className="btn btn-sm btn-primary"
           >
-            <UserPlus className="h-5 w-5 mr-2" />
+            <UserPlus className="h-4 w-4 mr-2" />
             Invite User
           </button>
         </div>
@@ -170,33 +170,33 @@ export default function Users() {
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8">
         {error && (
-          <div className="alert alert-error mt-6">
-            <span>{error}</span>
+          <div className="alert alert-error mt-4">
+            <span className="text-sm">{error}</span>
           </div>
         )}
 
         {/* Active Users */}
-        <div className="mt-8">
-          <h2 className="text-lg font-medium text-gray-900">Active Users</h2>
-          <div className="mt-4 overflow-hidden bg-white shadow sm:rounded-lg">
+        <div className="mt-6">
+          <h2 className="text-base font-medium text-gray-900">Active Users</h2>
+          <div className="mt-3 overflow-hidden bg-white shadow sm:rounded-lg">
             <ul className="divide-y divide-gray-200">
               {users.map((user) => (
                 <li 
                   key={user.id} 
-                  className={`px-6 py-4 ${isAdmin ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+                  className={`px-4 py-3 ${isAdmin ? 'cursor-pointer hover:bg-gray-50' : ''}`}
                   onClick={() => handleUserClick(user)}
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium text-gray-900">{user.full_name}</p>
-                      <p className="text-sm text-gray-500">{user.email}</p>
+                      <p className="text-sm font-medium text-gray-900">{user.full_name}</p>
+                      <p className="text-xs text-gray-500">{user.email}</p>
                     </div>
                     <div className="flex items-center space-x-4">
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${getRoleBadgeColors(user.role)}`}>
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${getRoleBadgeColors(user.role)}`}>
                         {user.role}
                       </span>
                       {isAdmin && (
-                        <UserCog className="h-4 w-4 text-gray-400" />
+                        <UserCog className="h-3 w-3 text-gray-400" />
                       )}
                     </div>
                   </div>
@@ -208,31 +208,31 @@ export default function Users() {
 
         {/* Pending Invitations */}
         {invitations.length > 0 && (
-          <div className="mt-8">
-            <h2 className="text-lg font-medium text-gray-900">Pending Invitations</h2>
-            <div className="mt-4 overflow-hidden bg-white shadow sm:rounded-lg">
+          <div className="mt-6">
+            <h2 className="text-base font-medium text-gray-900">Pending Invitations</h2>
+            <div className="mt-3 overflow-hidden bg-white shadow sm:rounded-lg">
               <ul className="divide-y divide-gray-200">
                 {invitations.map((invitation) => (
-                  <li key={invitation.id} className="px-6 py-4">
+                  <li key={invitation.id} className="px-4 py-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium text-gray-900">{invitation.email}</p>
-                        <p className="text-sm text-gray-500 flex items-center">
-                          <Mail className="h-4 w-4 mr-1" />
+                        <p className="text-sm font-medium text-gray-900">{invitation.email}</p>
+                        <p className="text-xs text-gray-500 flex items-center">
+                          <Mail className="h-3 w-3 mr-1" />
                           Invited by {invitation.inviter?.full_name}
-                          <Clock className="h-4 w-4 ml-4 mr-1" />
+                          <Clock className="h-3 w-3 ml-3 mr-1" />
                           Expires {new Date(invitation.expires_at).toLocaleDateString()}
                         </p>
                       </div>
                       <div className="flex items-center space-x-4">
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${getRoleBadgeColors(invitation.role)}`}>
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${getRoleBadgeColors(invitation.role)}`}>
                           {invitation.role}
                         </span>
                         <button
                           onClick={() => handleDeleteInvitation(invitation.id)}
                           className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3 w-3" />
                         </button>
                       </div>
                     </div>
@@ -248,26 +248,26 @@ export default function Users() {
       {showInviteModal && (
         <div className="modal modal-open">
           <div className="modal-box">
-            <h3 className="font-bold text-lg">Invite User</h3>
-            <form onSubmit={handleInvite} className="mt-4">
+            <h3 className="font-bold text-base">Invite User</h3>
+            <form onSubmit={handleInvite} className="mt-3">
               <div className="form-control">
                 <label className="label">
-                  <span className="label-text">Email</span>
+                  <span className="label-text text-sm">Email</span>
                 </label>
                 <input
                   type="email"
-                  className="input input-bordered"
+                  className="input input-bordered input-sm"
                   value={inviteForm.email}
                   onChange={(e) => setInviteForm(prev => ({ ...prev, email: e.target.value }))}
                   required
                 />
               </div>
-              <div className="form-control mt-4">
+              <div className="form-control mt-3">
                 <label className="label">
-                  <span className="label-text">Role</span>
+                  <span className="label-text text-sm">Role</span>
                 </label>
                 <select
-                  className="select select-bordered"
+                  className="select select-bordered select-sm"
                   value={inviteForm.role}
                   onChange={(e) => setInviteForm(prev => ({ ...prev, role: e.target.value }))}
                 >
@@ -279,14 +279,14 @@ export default function Users() {
               <div className="modal-action">
                 <button
                   type="button"
-                  className="btn"
+                  className="btn btn-sm"
                   onClick={() => setShowInviteModal(false)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn btn-primary"
+                  className="btn btn-sm btn-primary"
                   disabled={inviting}
                 >
                   {inviting ? 'Sending...' : 'Send Invitation'}
@@ -302,22 +302,22 @@ export default function Users() {
       {showUserModal && selectedUser && (
         <div className="modal modal-open">
           <div className="modal-box">
-            <h3 className="font-bold text-lg">User Details</h3>
-            <div className="mt-4">
-              <p className="text-sm text-gray-500">Name</p>
-              <p className="font-medium">{selectedUser.full_name}</p>
+            <h3 className="font-bold text-base">User Details</h3>
+            <div className="mt-3">
+              <p className="text-xs text-gray-500">Name</p>
+              <p className="text-sm font-medium">{selectedUser.full_name}</p>
               
-              <p className="text-sm text-gray-500 mt-4">Email</p>
-              <p className="font-medium">{selectedUser.email}</p>
+              <p className="text-xs text-gray-500 mt-3">Email</p>
+              <p className="text-sm font-medium">{selectedUser.email}</p>
 
-              <form onSubmit={handleUpdateRole} className="mt-4">
+              <form onSubmit={handleUpdateRole} className="mt-3">
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text">Role</span>
+                    <span className="label-text text-sm">Role</span>
                   </label>
                   <select
                     name="role"
-                    className="select select-bordered"
+                    className="select select-bordered select-sm"
                     defaultValue={selectedUser.role}
                   >
                     <option value="agent">Agent</option>
@@ -328,7 +328,7 @@ export default function Users() {
                 <div className="modal-action">
                   <button
                     type="button"
-                    className="btn"
+                    className="btn btn-sm"
                     onClick={() => {
                       setShowUserModal(false)
                       setSelectedUser(null)
@@ -338,7 +338,7 @@ export default function Users() {
                   </button>
                   <button
                     type="submit"
-                    className="btn btn-primary"
+                    className="btn btn-sm btn-primary"
                     disabled={updating}
                   >
                     {updating ? 'Updating...' : 'Update Role'}
