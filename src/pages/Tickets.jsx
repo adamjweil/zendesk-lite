@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Plus, Filter, Search, Calendar, User, X, MessageSquare, Clock, AlertCircle } from 'lucide-react'
-import { getTickets, createTicket, getTicketComments, updateTicket, createComment } from '../lib/database'
+import { getTickets, createTicket, getTicketComments, updateTicket, createComment, getTags, getTagsForTicket, addTagToTicket, removeTagFromTicket } from '../lib/database'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function Tickets() {
@@ -23,20 +23,45 @@ export default function Tickets() {
     priority: 'medium',
     category: '',
   })
+  const [availableTags, setAvailableTags] = useState([])
+  const [selectedTags, setSelectedTags] = useState([])
+  const [statusFilter, setStatusFilter] = useState('')
+  const [priorityFilter, setPriorityFilter] = useState('')
 
   useEffect(() => {
     loadTickets()
-  }, [filters])
+    loadAvailableTags()
+  }, [])
 
   useEffect(() => {
     if (selectedTicket) {
       loadTicketComments()
+      loadSelectedTags(selectedTicket.id)
     }
   }, [selectedTicket])
 
+  useEffect(() => {
+    loadTickets()
+  }, [statusFilter, priorityFilter])
+
   const loadTickets = async () => {
     setLoading(true)
-    const { data, error } = await getTickets(filters)
+    const queryFilters = {
+      ...filters,
+      status: statusFilter,
+      priority: priorityFilter
+    }
+    
+    // Remove empty/undefined values
+    Object.keys(queryFilters).forEach(key => {
+      if (!queryFilters[key]) {
+        delete queryFilters[key]
+      }
+    })
+
+    console.log('Loading tickets with filters:', queryFilters)
+    
+    const { data, error } = await getTickets(queryFilters)
     if (error) {
       console.error('Error loading tickets:', error)
     } else {
@@ -52,6 +77,24 @@ export default function Tickets() {
       console.error('Error loading comments:', error)
     } else {
       setTicketComments(data || [])
+    }
+  }
+
+  const loadAvailableTags = async () => {
+    const { data, error } = await getTags()
+    if (error) {
+      console.error('Error loading available tags:', error)
+    } else {
+      setAvailableTags(data || [])
+    }
+  }
+
+  const loadSelectedTags = async (ticketId) => {
+    const { data, error } = await getTagsForTicket(ticketId)
+    if (error) {
+      console.error('Error loading selected tags:', error)
+    } else {
+      setSelectedTags(data.map(tag => tag.tags) || [])
     }
   }
 
@@ -111,6 +154,24 @@ export default function Tickets() {
     }
   }
 
+  const handleAddTagToTicket = async (tagId) => {
+    const { error } = await addTagToTicket(selectedTicket.id, tagId)
+    if (error) {
+      console.error('Error adding tag to ticket:', error)
+    } else {
+      loadSelectedTags(selectedTicket.id)
+    }
+  }
+
+  const handleRemoveTagFromTicket = async (tagId) => {
+    const { error } = await removeTagFromTicket(selectedTicket.id, tagId)
+    if (error) {
+      console.error('Error removing tag from ticket:', error)
+    } else {
+      loadSelectedTags(selectedTicket.id)
+    }
+  }
+
   const priorityColors = {
     low: 'bg-gray-100 text-gray-800',
     medium: 'bg-blue-100 text-blue-800',
@@ -144,22 +205,6 @@ export default function Tickets() {
       <div className="bg-white p-4 rounded-lg shadow mb-6">
         <div className="flex flex-wrap gap-4">
           <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select
-              value={filters.status}
-              onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md"
-            >
-              <option value="">All Status</option>
-              <option value="new">New</option>
-              <option value="open">Open</option>
-              <option value="pending">Pending</option>
-              <option value="resolved">Resolved</option>
-              <option value="closed">Closed</option>
-            </select>
-          </div>
-
-          <div className="flex-1 min-w-[200px]">
             <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
             <div className="relative rounded-md shadow-sm">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -185,13 +230,40 @@ export default function Tickets() {
                   <thead className="bg-gray-50 sticky top-0 z-10">
                     <tr>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <div className="relative">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                          <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md"
+                          >
+                            <option value="">All Status</option>
+                            <option value="new">New</option>
+                            <option value="open">Open</option>
+                            <option value="pending">Pending</option>
+                            <option value="resolved">Resolved</option>
+                            <option value="closed">Closed</option>
+                          </select>
+                        </div>
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Title
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Priority
+                        <div className="relative">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                          <select
+                            value={priorityFilter}
+                            onChange={(e) => setPriorityFilter(e.target.value)}
+                            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md"
+                          >
+                            <option value="">All Priorities</option>
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                            <option value="urgent">Urgent</option>
+                          </select>
+                        </div>
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Created By
@@ -222,17 +294,17 @@ export default function Tickets() {
                           onClick={() => handleTicketClick(ticket)}
                         >
                           <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColors[ticket.status]}`}>
+                              {ticket.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-primary">
                               {ticket.subject}
                             </div>
                             <div className="text-sm text-gray-500 truncate max-w-md">
                               {ticket.description}
                             </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColors[ticket.status]}`}>
-                              {ticket.status}
-                            </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${priorityColors[ticket.priority]}`}>
@@ -394,6 +466,28 @@ export default function Tickets() {
                       </button>
                     </div>
                   </form>
+                </div>
+
+                {/* Tags Section */}
+                <div className="mt-4">
+                  <h4 className="text-lg font-medium text-gray-900 mb-2">Tags</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedTags.map((tag) => (
+                      <span key={tag.id} className="inline-flex items-center px-2 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-800">
+                        {tag.name}
+                        <button onClick={() => handleRemoveTagFromTicket(tag.id)} className="ml-1 text-red-500">&times;</button>
+                      </span>
+                    ))}
+                  </div>
+                  <select
+                    onChange={(e) => handleAddTagToTicket(e.target.value)}
+                    className="mt-2 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md"
+                  >
+                    <option value="">Add a tag</option>
+                    {availableTags.map((tag) => (
+                      <option key={tag.id} value={tag.id}>{tag.name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>

@@ -221,7 +221,7 @@ export const getTickets = async (filters = {}) => {
       query = query.eq('id', filters.id)
     }
     if (filters.status) {
-      query = query.eq('status', filters.status)
+      query = query.ilike('status', filters.status)
     }
     if (filters.assignee_id) {
       query = query.eq('assignee_id', filters.assignee_id)
@@ -229,8 +229,15 @@ export const getTickets = async (filters = {}) => {
     if (filters.creator_id) {
       query = query.eq('creator_id', filters.creator_id)
     }
+    if (filters.priority) {
+      query = query.eq('priority', filters.priority)
+    }
+
+    console.log('Executing query:', query)
 
     const { data, error } = await query.order('created_at', { ascending: false })
+    console.log('Data:', data)
+    console.log('Error:', error)
     return { data, error }
   } catch (error) {
     console.error('Error fetching tickets:', error)
@@ -491,4 +498,51 @@ export const createTestData = async () => {
     console.error('Error creating test data:', error)
     return { error }
   }
+}
+
+// Tag operations
+export const getTags = async () => {
+  const { data, error } = await supabase.from('tags').select('*')
+  return { data, error }
+}
+
+export const createTag = async (tagData) => {
+  const { data, error } = await supabase.from('tags').insert(tagData).select().single()
+  return { data, error }
+}
+
+export const updateTag = async (tagId, updates) => {
+  const { data, error } = await supabase.from('tags').update(updates).eq('id', tagId).select().single()
+  return { data, error }
+}
+
+export const deleteTag = async (tagId) => {
+  const { error } = await supabase.from('tags').delete().eq('id', tagId)
+  return { error }
+}
+
+export const getTagsForTicket = async (ticketId) => {
+  const { data, error } = await supabase
+    .from('ticket_tags')
+    .select('tags(*)')
+    .eq('ticket_id', ticketId)
+  return { data, error }
+}
+
+export const addTagToTicket = async (ticketId, tagId) => {
+  const { data, error } = await supabase
+    .from('ticket_tags')
+    .insert({ ticket_id: ticketId, tag_id: tagId })
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const removeTagFromTicket = async (ticketId, tagId) => {
+  const { error } = await supabase
+    .from('ticket_tags')
+    .delete()
+    .eq('ticket_id', ticketId)
+    .eq('tag_id', tagId)
+  return { error }
 } 
