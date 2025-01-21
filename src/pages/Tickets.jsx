@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Filter, Search, Calendar, User, X, MessageSquare, Clock, AlertCircle } from 'lucide-react'
+import { Plus, Filter, Search, Calendar, User, X, MessageSquare, Clock, AlertCircle, ChevronUp, ChevronDown } from 'lucide-react'
 import { getTickets, createTicket, getTicketComments, updateTicket, createComment, getTags, getTagsForTicket, addTagToTicket, removeTagFromTicket, getOrganizationUsers } from '../lib/database'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -28,6 +28,10 @@ export default function Tickets() {
   const [statusFilter, setStatusFilter] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('')
   const [organizationUsers, setOrganizationUsers] = useState([])
+  const [sortConfig, setSortConfig] = useState({
+    key: 'created_at',
+    direction: 'desc'
+  })
 
   useEffect(() => {
     loadTickets()
@@ -193,6 +197,53 @@ export default function Tickets() {
     }
   }
 
+  const handleSort = (key) => {
+    setSortConfig(prevConfig => ({
+      key,
+      direction: prevConfig.key === key && prevConfig.direction === 'asc' ? 'desc' : 'asc'
+    }))
+    
+    // Sort the tickets
+    const sortedTickets = [...tickets].sort((a, b) => {
+      let aValue = a[key];
+      let bValue = b[key];
+      
+      // Handle nested properties
+      if (key === 'creator') aValue = a.creator?.full_name
+      if (key === 'creator') bValue = b.creator?.full_name
+      if (key === 'assignee') aValue = a.assignee?.full_name
+      if (key === 'assignee') bValue = b.assignee?.full_name
+      
+      // Handle null values
+      if (aValue === null) return 1
+      if (bValue === null) return -1
+      
+      // Handle dates
+      if (key === 'created_at') {
+        return sortConfig.direction === 'asc' 
+          ? new Date(aValue) - new Date(bValue)
+          : new Date(bValue) - new Date(aValue)
+      }
+      
+      // Handle strings
+      if (typeof aValue === 'string') {
+        return sortConfig.direction === 'asc'
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue)
+      }
+      
+      // Handle numbers
+      return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue
+    })
+    
+    setTickets(sortedTickets)
+  }
+
+  const getSortIcon = (key) => {
+    if (sortConfig.key !== key) return null
+    return sortConfig.direction === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+  }
+
   const priorityColors = {
     low: 'bg-gray-100 text-gray-800',
     medium: 'bg-blue-100 text-blue-800',
@@ -250,9 +301,15 @@ export default function Tickets() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50 sticky top-0 z-10">
                     <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">
+                      <th 
+                        scope="col" 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48"
+                      >
                         <div className="relative">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                          <div className="flex items-center cursor-pointer hover:bg-gray-100 p-1 rounded mb-1" onClick={() => handleSort('status')}>
+                            Status
+                            {getSortIcon('status')}
+                          </div>
                           <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
@@ -267,12 +324,25 @@ export default function Tickets() {
                           </select>
                         </div>
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Title
+                      <th 
+                        scope="col" 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('subject')}
+                      >
+                        <div className="flex items-center">
+                          Title
+                          {getSortIcon('subject')}
+                        </div>
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">
+                      <th 
+                        scope="col" 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48"
+                      >
                         <div className="relative">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                          <div className="flex items-center cursor-pointer hover:bg-gray-100 p-1 rounded mb-1" onClick={() => handleSort('priority')}>
+                            Priority
+                            {getSortIcon('priority')}
+                          </div>
                           <select
                             value={priorityFilter}
                             onChange={(e) => setPriorityFilter(e.target.value)}
@@ -286,14 +356,35 @@ export default function Tickets() {
                           </select>
                         </div>
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Created By
+                      <th 
+                        scope="col" 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('creator')}
+                      >
+                        <div className="flex items-center">
+                          Created By
+                          {getSortIcon('creator')}
+                        </div>
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Assigned To
+                      <th 
+                        scope="col" 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('assignee')}
+                      >
+                        <div className="flex items-center">
+                          Assigned To
+                          {getSortIcon('assignee')}
+                        </div>
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Created At
+                      <th 
+                        scope="col" 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('created_at')}
+                      >
+                        <div className="flex items-center">
+                          Created At
+                          {getSortIcon('created_at')}
+                        </div>
                       </th>
                     </tr>
                   </thead>
@@ -344,7 +435,11 @@ export default function Tickets() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
-                              {ticket.assignee?.full_name || 'Unassigned'}
+                              {ticket.assignee?.full_name || (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                  Unassigned
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
