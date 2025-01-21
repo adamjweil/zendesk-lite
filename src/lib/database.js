@@ -599,4 +599,51 @@ export const removeTagFromTicket = async (ticketId, tagId) => {
     .eq('ticket_id', ticketId)
     .eq('tag_id', tagId)
   return { error }
+}
+
+// Agent statistics
+export const getAgentStats = async (agentId) => {
+  try {
+    const { data: openTickets, error: openError } = await supabase
+      .from('tickets')
+      .select('id, created_at')
+      .eq('assignee_id', agentId)
+      .neq('status', 'closed')
+
+    const { data: closedTickets, error: closedError } = await supabase
+      .from('tickets')
+      .select('id, created_at, updated_at')
+      .eq('assignee_id', agentId)
+      .eq('status', 'closed')
+
+    if (openError || closedError) throw openError || closedError
+
+    // Calculate average time tickets have been open
+    const now = new Date()
+    let totalOpenTime = 0
+    openTickets.forEach(ticket => {
+      const createdAt = new Date(ticket.created_at)
+      totalOpenTime += now - createdAt
+    })
+
+    // Calculate average time to close tickets
+    let totalTimeToClose = 0
+    closedTickets.forEach(ticket => {
+      const createdAt = new Date(ticket.created_at)
+      const closedAt = new Date(ticket.updated_at)
+      totalTimeToClose += closedAt - createdAt
+    })
+
+    const stats = {
+      openTickets: openTickets.length,
+      closedTickets: closedTickets.length,
+      averageOpenTime: openTickets.length ? Math.round(totalOpenTime / openTickets.length / (1000 * 60 * 60)) : 0, // in hours
+      averageTimeToClose: closedTickets.length ? Math.round(totalTimeToClose / closedTickets.length / (1000 * 60 * 60)) : 0 // in hours
+    }
+
+    return { data: stats, error: null }
+  } catch (error) {
+    console.error('Error fetching agent stats:', error)
+    return { data: null, error }
+  }
 } 
