@@ -9,6 +9,7 @@ import {
   Building,
   User,
   BarChart,
+  PlusCircle,
 } from 'lucide-react'
 import { getTickets } from '../lib/database'
 
@@ -75,6 +76,13 @@ export default function Sidebar() {
       icon: Ticket,
       current: location.pathname === '/tickets',
     },
+    // Show Submit Issue to customers only
+    ...(!isAdmin && !isAgent ? [{
+      name: 'Submit Issue',
+      href: '/submit-issue',
+      icon: PlusCircle,
+      current: location.pathname === '/submit-issue',
+    }] : []),
     // Show Analytics to admins and agents only
     ...(isAdmin || isAgent ? [{
       name: 'Analytics',
@@ -222,9 +230,20 @@ export default function Sidebar() {
               />
             </div>
             <div className="ml-3 flex-1">
-              <p className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
-                {profile?.full_name}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
+                  {profile?.full_name}
+                </p>
+                <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${
+                  profile?.role === 'admin' 
+                    ? 'bg-purple-50 text-purple-700'
+                    : profile?.role === 'agent'
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'bg-gray-50 text-gray-700'
+                }`}>
+                  {profile?.role === 'admin' ? 'Admin' : profile?.role === 'agent' ? 'Agent' : 'Customer'}
+                </span>
+              </div>
               {profile?.title && (
                 <p className="text-xs text-gray-500">
                   {profile.title}

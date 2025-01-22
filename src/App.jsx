@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
+import { Toaster } from 'react-hot-toast'
 import ProtectedRoute from './components/ProtectedRoute'
 import MainLayout from './layouts/MainLayout'
 import Dashboard from './pages/Dashboard'
@@ -12,11 +13,13 @@ import OrganizationSettings from './pages/OrganizationSettings'
 import Tickets from './pages/Tickets'
 import TicketDetails from './pages/TicketDetails'
 import Analytics from './pages/Analytics'
+import SubmitIssue from './pages/SubmitIssue'
 
 function App() {
   return (
     <AuthProvider>
       <Router>
+        <Toaster position="top-right" />
         <Routes>
           {/* Public routes */}
           <Route path="/login" element={<Login />} />
@@ -38,6 +41,7 @@ function App() {
             <Route path="tickets" element={<Tickets />} />
             <Route path="tickets/:ticketId" element={<TicketDetails />} />
             <Route path="analytics" element={<Analytics />} />
+            <Route path="submit-issue" element={<SubmitIssue />} />
             <Route path="organization/settings" element={<OrganizationSettings />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

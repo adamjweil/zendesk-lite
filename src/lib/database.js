@@ -309,8 +309,10 @@ export const createTicket = async (ticketData) => {
         updated_at: new Date().toISOString(),
       }])
       .select()
+      .single()
 
-    return { data, error }
+    if (error) throw error
+    return { data, error: null }
   } catch (error) {
     console.error('Error creating ticket:', error)
     return { data: null, error }
