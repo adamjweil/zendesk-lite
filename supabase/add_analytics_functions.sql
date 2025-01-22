@@ -76,6 +76,11 @@ BEGIN
             SELECT COUNT(*)
             FROM org_tickets
         ),
+        'new_tickets', (
+            SELECT COUNT(*)
+            FROM org_tickets
+            WHERE created_at >= NOW() - INTERVAL '24 hours'
+        ),
         'open_tickets', (
             SELECT COUNT(*)
             FROM org_tickets
