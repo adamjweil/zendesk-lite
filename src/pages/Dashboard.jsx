@@ -1,15 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Clock, Users, CheckCircle, AlertCircle, MessageSquare, PlusCircle, ChevronLeft, ChevronRight, Timer } from 'lucide-react'
-import { getRecentActivities, getTickets, getAgentStats } from '../lib/database'
+import { MessageSquare, PlusCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { getRecentActivities, getTickets } from '../lib/database'
 import { useAuth } from '../contexts/AuthContext'
-
-const stats = [
-  { name: 'Open Tickets', value: '12', icon: AlertCircle, color: 'text-red-500' },
-  { name: 'Resolved Today', value: '8', icon: CheckCircle, color: 'text-green-500' },
-  { name: 'Average Response Time', value: '2.5h', icon: Clock, color: 'text-blue-500' },
-  { name: 'Active Agents', value: '4', icon: Users, color: 'text-purple-500' },
-]
 
 export default function Dashboard() {
   const { profile } = useAuth()
@@ -20,7 +13,6 @@ export default function Dashboard() {
   const [metadata, setMetadata] = useState(null)
   const [ticketPage, setTicketPage] = useState(1)
   const [ticketMetadata, setTicketMetadata] = useState(null)
-  const [agentStats, setAgentStats] = useState(null)
   const TICKETS_PER_PAGE = 10
 
   useEffect(() => {
@@ -28,9 +20,6 @@ export default function Dashboard() {
       loadActivities()
     } else {
       loadTickets()
-      if (profile?.role === 'agent') {
-        loadAgentStats()
-      }
     }
   }, [currentPage, ticketPage, profile])
 
@@ -67,16 +56,6 @@ export default function Dashboard() {
       setTicketMetadata(meta)
     }
     setLoading(false)
-  }
-
-  const loadAgentStats = async () => {
-    if (!profile?.id) return
-    const { data, error } = await getAgentStats(profile.id)
-    if (error) {
-      console.error('Error loading agent stats:', error)
-    } else {
-      setAgentStats(data)
-    }
   }
 
   const handlePreviousPage = () => {
@@ -152,67 +131,6 @@ export default function Dashboard() {
     }
   }
 
-  const renderAgentStats = () => {
-    if (!agentStats) return null
-
-    const agentStatsData = [
-      { 
-        name: 'Open Tickets', 
-        value: agentStats.openTickets.toString(), 
-        icon: AlertCircle, 
-        color: 'text-red-500' 
-      },
-      { 
-        name: 'Closed Tickets', 
-        value: agentStats.closedTickets.toString(), 
-        icon: CheckCircle, 
-        color: 'text-green-500' 
-      },
-      { 
-        name: 'Avg. Time Open', 
-        value: `${agentStats.averageOpenTime}h`, 
-        icon: Clock, 
-        color: 'text-blue-500' 
-      },
-      { 
-        name: 'Avg. Time to Close', 
-        value: `${agentStats.averageTimeToClose}h`, 
-        icon: Timer, 
-        color: 'text-purple-500' 
-      },
-    ]
-
-    return (
-      <div className="mt-8">
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {agentStatsData.map((stat) => (
-            <div
-              key={stat.name}
-              className="relative overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:px-6 sm:py-6"
-            >
-              <dt>
-                <div className={`absolute rounded-md p-3 ${stat.color} bg-opacity-10`}>
-                  <stat.icon
-                    className={`h-6 w-6 ${stat.color}`}
-                    aria-hidden="true"
-                  />
-                </div>
-                <p className="ml-16 truncate text-sm font-medium text-gray-500">
-                  {stat.name}
-                </p>
-              </dt>
-              <dd className="ml-16 flex items-baseline">
-                <p className="text-2xl font-semibold text-gray-900">
-                  {stat.value}
-                </p>
-              </dd>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
   const renderTicketList = () => {
     if (loading) {
       return <div className="text-center py-8">Loading tickets...</div>
@@ -231,9 +149,6 @@ export default function Dashboard() {
 
     return (
       <div className="space-y-8">
-        {/* Agent Stats */}
-        {profile?.role === 'agent' && renderAgentStats()}
-
         {/* Open Tickets */}
         <div className="bg-white shadow rounded-lg p-6">
           <h3 className="text-lg font-medium text-gray-900 mb-4">
@@ -368,35 +283,6 @@ export default function Dashboard() {
 
   const renderAdminDashboard = () => (
     <>
-      {/* Stats */}
-      <div className="mt-8">
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat) => (
-            <div
-              key={stat.name}
-              className="relative overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:px-6 sm:py-6"
-            >
-              <dt>
-                <div className={`absolute rounded-md p-3 ${stat.color} bg-opacity-10`}>
-                  <stat.icon
-                    className={`h-6 w-6 ${stat.color}`}
-                    aria-hidden="true"
-                  />
-                </div>
-                <p className="ml-16 truncate text-sm font-medium text-gray-500">
-                  {stat.name}
-                </p>
-              </dt>
-              <dd className="ml-16 flex items-baseline">
-                <p className="text-2xl font-semibold text-gray-900">
-                  {stat.value}
-                </p>
-              </dd>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Recent Activity */}
       <div className="mt-8">
         <div className="rounded-lg bg-white shadow">
