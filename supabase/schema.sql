@@ -46,10 +46,34 @@ CREATE TABLE organizations (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
+-- Create integrations table
+CREATE TABLE integrations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+  provider VARCHAR NOT NULL,
+  config JSONB NOT NULL,
+  credentials JSONB NOT NULL,
+  enabled BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE integration_mappings (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  integration_id UUID REFERENCES integrations(id) ON DELETE CASCADE,
+  external_id VARCHAR NOT NULL,
+  ticket_id UUID REFERENCES tickets(id) ON DELETE CASCADE,
+  metadata JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Create RLS policies
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tickets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE integrations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE integration_mappings ENABLE ROW LEVEL SECURITY;
 
 -- Profiles policies
 CREATE POLICY "Public profiles are viewable by everyone" ON profiles
@@ -92,6 +116,24 @@ CREATE POLICY "Authenticated users can create comments" ON comments
 
 CREATE POLICY "Users can update their own comments" ON comments
     FOR UPDATE USING (author_id = auth.uid());
+
+-- Integration policies
+CREATE POLICY "Organizations can manage their own integrations"
+  ON integrations
+  USING (organization_id IN (
+    SELECT organization_id FROM profiles
+    WHERE id = auth.uid()
+  ));
+
+CREATE POLICY "Organizations can manage their own integration mappings"
+  ON integration_mappings
+  USING (integration_id IN (
+    SELECT id FROM integrations
+    WHERE organization_id IN (
+      SELECT organization_id FROM profiles
+      WHERE id = auth.uid()
+    )
+  ));
 
 -- Create function to handle updated_at
 CREATE OR REPLACE FUNCTION handle_updated_at()
