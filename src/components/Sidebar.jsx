@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useState, useEffect } from 'react'
 import { 
   LayoutDashboard, 
   Ticket, 
@@ -8,11 +9,13 @@ import {
   Building,
   User,
 } from 'lucide-react'
+import { getTickets } from '../lib/database'
 
 export default function Sidebar() {
   console.log('Sidebar component mounting...')
   const location = useLocation()
   const { user, profile, signOut } = useAuth()
+  const [openTickets, setOpenTickets] = useState([])
   
   console.log('Profile in Sidebar:', profile)
   console.log('Organization data:', profile?.organization)
@@ -20,6 +23,42 @@ export default function Sidebar() {
   
   const isAdmin = profile?.role === 'admin'
   console.log('Is Admin:', isAdmin)
+
+  useEffect(() => {
+    loadOpenTickets()
+    // Set up polling to check for ticket updates every 30 seconds
+    const interval = setInterval(loadOpenTickets, 30000)
+    
+    // Listen for ticket update events
+    const handleTicketUpdate = () => {
+      loadOpenTickets()
+    }
+    window.addEventListener('ticketUpdated', handleTicketUpdate)
+    
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('ticketUpdated', handleTicketUpdate)
+    }
+  }, [profile])
+
+  const loadOpenTickets = async () => {
+    if (!profile?.id) return
+    
+    const { data, error } = await getTickets({
+      status: 'open',
+      assignee_id: profile.id
+    })
+    
+    if (error) {
+      console.error('Error loading open tickets:', error)
+    } else {
+      // Sort by creation date (oldest first) and limit to 10
+      const sortedTickets = (data || [])
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+        .slice(0, 10)
+      setOpenTickets(sortedTickets)
+    }
+  }
 
   const navigation = [
     {
@@ -57,6 +96,20 @@ export default function Sidebar() {
   
   console.log('Navigation array:', navigation)
 
+  const priorityColors = {
+    low: 'bg-gray-100 text-gray-800',
+    medium: 'bg-blue-100 text-blue-800',
+    high: 'bg-orange-100 text-orange-800',
+    urgent: 'bg-red-100 text-red-800',
+  }
+
+  const priorityIconColors = {
+    low: 'text-gray-400',
+    medium: 'text-blue-500',
+    high: 'text-orange-500',
+    urgent: 'text-red-500',
+  }
+
   return (
     <div className="w-64 flex-shrink-0 border-r border-gray-200 bg-white flex flex-col h-full">
       <div className="flex-1 flex flex-col overflow-y-auto">
@@ -91,31 +144,65 @@ export default function Sidebar() {
         </div>
         <nav className="mt-5 flex-1 space-y-1 bg-white px-2">
           {navigation.map((item) => (
-            <Link
-              key={item.name}
-              to={item.href}
-              className={`
-                group flex items-center px-2 py-2 text-sm font-medium rounded-md
-                ${
-                  item.current
-                    ? 'bg-gray-100 text-gray-900'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }
-              `}
-            >
-              <item.icon
+            <div key={item.name}>
+              <Link
+                to={item.href}
                 className={`
-                  mr-3 h-6 w-6 flex-shrink-0
+                  group flex items-center px-2 py-2 text-sm font-medium rounded-md
                   ${
                     item.current
-                      ? 'text-gray-500'
-                      : 'text-gray-400 group-hover:text-gray-500'
+                      ? 'bg-gray-100 text-gray-900'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   }
                 `}
-                aria-hidden="true"
-              />
-              {item.name}
-            </Link>
+              >
+                <item.icon
+                  className={`
+                    mr-3 h-6 w-6 flex-shrink-0
+                    ${
+                      item.current
+                        ? 'text-gray-500'
+                        : 'text-gray-400 group-hover:text-gray-500'
+                    }
+                  `}
+                  aria-hidden="true"
+                />
+                {item.name}
+              </Link>
+              
+              {/* Show open tickets section right after Tickets nav item */}
+              {item.name === 'Tickets' && openTickets.length > 0 && (
+                <div className="ml-6 mt-1">
+                  <div className="space-y-1">
+                    {openTickets.map((ticket) => (
+                      <Link
+                        key={ticket.id}
+                        to={`/tickets/${ticket.id}`}
+                        className={`
+                          group flex items-center px-2 py-1.5 text-xs font-medium rounded-md
+                          ${location.pathname === `/tickets/${ticket.id}`
+                            ? 'bg-gray-100 text-gray-900'
+                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                          }
+                        `}
+                      >
+                        <Ticket className={`mr-2 h-4 w-4 flex-shrink-0 ${priorityIconColors[ticket.priority]}`} />
+                        <div className="flex-1 flex items-center justify-between">
+                          <span className="truncate text-[10px]" title={ticket.subject}>
+                            {ticket.subject.length > 20 
+                              ? `${ticket.subject.substring(0, 20)}...` 
+                              : ticket.subject}
+                          </span>
+                          <span className={`ml-1 px-1 py-0.5 inline-flex text-[10px] leading-3 font-medium rounded-full ${priorityColors[ticket.priority]}`}>
+                            {ticket.priority}
+                          </span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           ))}
         </nav>
       </div>
