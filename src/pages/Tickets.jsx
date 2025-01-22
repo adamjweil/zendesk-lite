@@ -278,21 +278,52 @@ export default function Tickets() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <div className="flex flex-wrap gap-4">
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
-            <div className="relative rounded-md shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-gray-400" />
-              </div>
-              <input
-                type="text"
-                placeholder="Search tickets..."
-                className="focus:ring-primary focus:border-primary block w-full pl-10 sm:text-sm border-gray-300 rounded-md"
-              />
-            </div>
-          </div>
+      <div className="flex items-center space-x-4 mb-6">
+        <div className="flex items-center space-x-2">
+          <Filter className="h-4 w-4 text-gray-500" />
+          <span className="text-sm font-medium text-gray-700">Filters:</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="inline-flex items-center px-2.5 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-primary"
+          >
+            <option value="">All Status</option>
+            <option value="new">New</option>
+            <option value="open">Open</option>
+            <option value="pending">Pending</option>
+            <option value="resolved">Resolved</option>
+            <option value="closed">Closed</option>
+          </select>
+          <select
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value)}
+            className="inline-flex items-center px-2.5 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-primary"
+          >
+            <option value="">All Priorities</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+          </select>
+          {(statusFilter || priorityFilter) && (
+            <button
+              onClick={() => {
+                setStatusFilter('')
+                setPriorityFilter('')
+              }}
+              className="inline-flex items-center p-1 border border-transparent rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-primary"
+              title="Clear filters"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <div className="flex-1 text-right">
+          <span className="text-sm text-gray-500">
+            {tickets.length} {tickets.length === 1 ? 'ticket' : 'tickets'} found
+          </span>
         </div>
       </div>
 
@@ -314,18 +345,6 @@ export default function Tickets() {
                             Status
                             {getSortIcon('status')}
                           </div>
-                          <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md"
-                          >
-                            <option value="">All Status</option>
-                            <option value="new">New</option>
-                            <option value="open">Open</option>
-                            <option value="pending">Pending</option>
-                            <option value="resolved">Resolved</option>
-                            <option value="closed">Closed</option>
-                          </select>
                         </div>
                       </th>
                       <th 
@@ -347,17 +366,6 @@ export default function Tickets() {
                             Priority
                             {getSortIcon('priority')}
                           </div>
-                          <select
-                            value={priorityFilter}
-                            onChange={(e) => setPriorityFilter(e.target.value)}
-                            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md"
-                          >
-                            <option value="">All Priorities</option>
-                            <option value="low">Low</option>
-                            <option value="medium">Medium</option>
-                            <option value="high">High</option>
-                            <option value="urgent">Urgent</option>
-                          </select>
                         </div>
                       </th>
                       <th 
