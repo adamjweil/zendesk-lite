@@ -8,6 +8,7 @@ import {
   LogOut,
   Building,
   User,
+  BarChart,
 } from 'lucide-react'
 import { getTickets } from '../lib/database'
 
@@ -22,6 +23,7 @@ export default function Sidebar() {
   console.log('Organization name:', profile?.organization?.name)
   
   const isAdmin = profile?.role === 'admin'
+  const isAgent = profile?.role === 'agent'
   console.log('Is Admin:', isAdmin)
 
   useEffect(() => {
@@ -73,12 +75,13 @@ export default function Sidebar() {
       icon: Ticket,
       current: location.pathname === '/tickets',
     },
-    // {
-    //   name: 'Users',
-    //   href: '/users',
-    //   icon: Users,
-    //   current: location.pathname === '/users',
-    // },
+    // Show Analytics to admins and agents only
+    ...(isAdmin || isAgent ? [{
+      name: 'Analytics',
+      href: '/analytics',
+      icon: BarChart,
+      current: location.pathname === '/analytics',
+    }] : []),
     {
       name: 'Profile',
       href: '/profile',

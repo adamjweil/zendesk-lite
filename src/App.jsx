@@ -11,6 +11,7 @@ import AcceptInvitation from './pages/AcceptInvitation'
 import OrganizationSettings from './pages/OrganizationSettings'
 import Tickets from './pages/Tickets'
 import TicketDetails from './pages/TicketDetails'
+import Analytics from './pages/Analytics'
 
 function App() {
   return (
@@ -36,8 +37,7 @@ function App() {
             <Route path="users" element={<Users />} />
             <Route path="tickets" element={<Tickets />} />
             <Route path="tickets/:ticketId" element={<TicketDetails />} />
-            <Route path="knowledge-base" element={<div>Knowledge Base coming soon...</div>} />
-            <Route path="reports" element={<div>Reports coming soon...</div>} />
+            <Route path="analytics" element={<Analytics />} />
             <Route path="organization/settings" element={<OrganizationSettings />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
