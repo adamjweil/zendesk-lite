@@ -125,6 +125,8 @@ export default function Tickets() {
       console.error('Error updating ticket status:', error)
     } else {
       setSelectedTicket({ ...selectedTicket, status: newStatus })
+      // Dispatch custom event to trigger sidebar update
+      window.dispatchEvent(new CustomEvent('ticketUpdated'))
       loadTickets() // Refresh the list
     }
   }
@@ -134,6 +136,8 @@ export default function Tickets() {
     if (error) {
       console.error('Error updating ticket assignee:', error)
     } else {
+      // Dispatch custom event to trigger sidebar update
+      window.dispatchEvent(new CustomEvent('ticketUpdated'))
       loadTickets() // Refresh the list
     }
   }

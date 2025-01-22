@@ -4,6 +4,9 @@ import { useAuth } from '../contexts/AuthContext'
 import { getTickets, updateTicket, getTicketComments, createComment, getOrganizationUsers } from '../lib/database'
 import { MessageSquare, Clock, AlertCircle } from 'lucide-react'
 
+// Create a custom event for ticket updates
+const TICKET_UPDATED_EVENT = 'ticketUpdated'
+
 export default function TicketDetails() {
   const { ticketId } = useParams()
   const navigate = useNavigate()
@@ -57,7 +60,19 @@ export default function TicketDetails() {
     if (error) {
       console.error('Error updating ticket status:', error)
     } else {
-      loadTicketDetails()
+      // Update local state
+      setTicket(prev => ({ ...prev, status: newStatus }))
+      
+      // Dispatch custom event to trigger sidebar update
+      window.dispatchEvent(new CustomEvent(TICKET_UPDATED_EVENT))
+      
+      // If the ticket is no longer open and was assigned to the current user,
+      // navigate back to the tickets list
+      if (newStatus !== 'open' && ticket?.assignee_id === profile?.id) {
+        navigate('/tickets')
+      } else {
+        loadTicketDetails()
+      }
     }
   }
 
@@ -66,6 +81,9 @@ export default function TicketDetails() {
     if (error) {
       console.error('Error updating ticket assignee:', error)
     } else {
+      // Update local state and trigger sidebar update
+      setTicket(prev => ({ ...prev, assignee_id: newAssigneeId }))
+      window.dispatchEvent(new CustomEvent(TICKET_UPDATED_EVENT))
       loadTicketDetails()
     }
   }
