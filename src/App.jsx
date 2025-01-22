@@ -14,6 +14,7 @@ import Tickets from './pages/Tickets'
 import TicketDetails from './pages/TicketDetails'
 import Analytics from './pages/Analytics'
 import SubmitIssue from './pages/SubmitIssue'
+import Integrations from './pages/Integrations'
 
 function App() {
   return (
@@ -43,6 +44,7 @@ function App() {
             <Route path="analytics" element={<Analytics />} />
             <Route path="submit-issue" element={<SubmitIssue />} />
             <Route path="organization/settings" element={<OrganizationSettings />} />
+            <Route path="integrations" element={<Integrations />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

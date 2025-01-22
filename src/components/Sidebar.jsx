@@ -10,6 +10,9 @@ import {
   User,
   BarChart,
   PlusCircle,
+  BarChart2,
+  Settings,
+  Plug
 } from 'lucide-react'
 import { getTickets } from '../lib/database'
 
@@ -87,7 +90,7 @@ export default function Sidebar() {
     ...(isAdmin || isAgent ? [{
       name: 'Analytics',
       href: '/analytics',
-      icon: BarChart,
+      icon: BarChart2,
       current: location.pathname === '/analytics',
     }] : []),
     {
@@ -103,6 +106,9 @@ export default function Sidebar() {
       icon: Building,
       current: location.pathname === '/organization/settings',
     }] : []),
+    ...(isAdmin ? [
+      { name: 'Integrations', href: '/integrations', icon: Plug, current: location.pathname === '/integrations' }
+    ] : [])
   ]
   
   console.log('Navigation array:', navigation)
