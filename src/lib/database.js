@@ -262,40 +262,44 @@ export const deleteInvitation = async (invitationId) => {
 // Ticket operations
 export const getTickets = async (filters = {}) => {
   try {
-    let query = supabase
+    // First get tickets
+    const query = supabase
       .from('tickets')
-      .select(`
-        *,
-        creator:profiles!tickets_creator_id_fkey(id, full_name),
-        assignee:profiles!tickets_assignee_id_fkey(id, full_name)
-      `)
+      .select('*')
+      .order('created_at', { ascending: false });
 
     // Apply filters
-    if (filters.id) {
-      query = query.eq('id', filters.id)
-    }
-    if (filters.status) {
-      query = query.ilike('status', filters.status)
-    }
-    if (filters.assignee_id) {
-      query = query.eq('assignee_id', filters.assignee_id)
-    }
-    if (filters.creator_id) {
-      query = query.eq('creator_id', filters.creator_id)
-    }
-    if (filters.priority) {
-      query = query.eq('priority', filters.priority)
-    }
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) {
+        query.eq(key, value);
+      }
+    });
 
-    console.log('Executing query:', query)
+    const { data: tickets, error } = await query;
+    if (error) throw error;
 
-    const { data, error } = await query.order('created_at', { ascending: false })
-    console.log('Data:', data)
-    console.log('Error:', error)
-    return { data, error }
+    // Then get profiles and teams for mapping
+    const [{ data: profiles }, { data: teams }] = await Promise.all([
+      supabase.from('profiles').select('id, full_name'),
+      supabase.from('teams').select('id, name')
+    ]);
+
+    // Create lookup maps
+    const profileMap = Object.fromEntries(profiles?.map(p => [p.id, p.full_name]) || []);
+    const teamMap = Object.fromEntries(teams?.map(t => [t.id, t.name]) || []);
+
+    // Enhance tickets with user and team information
+    const enhancedTickets = tickets.map(ticket => ({
+      ...ticket,
+      creator: profiles?.find(p => p.id === ticket.creator_id),
+      assigned_user: ticket.assignee_type === 'user' ? { id: ticket.assigned_to, full_name: profileMap[ticket.assigned_to] } : null,
+      assigned_team: ticket.assignee_type === 'team' ? { id: ticket.assigned_to, name: teamMap[ticket.assigned_to] } : null
+    }));
+
+    return { data: enhancedTickets, error: null };
   } catch (error) {
-    console.error('Error fetching tickets:', error)
-    return { data: null, error }
+    console.error('Error in getTickets:', error);
+    return { data: null, error };
   }
 }
 
@@ -303,19 +307,23 @@ export const createTicket = async (ticketData) => {
   try {
     const { data, error } = await supabase
       .from('tickets')
-      .insert([{
-        ...ticketData,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }])
-      .select()
-      .single()
+      .insert([ticketData])
+      .select(`
+        *,
+        creator:profiles!creator_id(*),
+        assignee:profiles(*)
+      `)
+      .single();
 
-    if (error) throw error
-    return { data, error: null }
+    if (error) {
+      console.error('Error creating ticket:', error);
+      return { data: null, error };
+    }
+
+    return { data, error: null };
   } catch (error) {
-    console.error('Error creating ticket:', error)
-    return { data: null, error }
+    console.error('Error in createTicket:', error);
+    return { data: null, error };
   }
 }
 
@@ -323,17 +331,52 @@ export const updateTicket = async (ticketId, updates) => {
   try {
     const { data, error } = await supabase
       .from('tickets')
+      .update(updates)
+      .eq('id', ticketId)
+      .select(`
+        *,
+        creator:profiles!creator_id(*),
+        assignee:profiles(*)
+      `)
+      .single();
+
+    if (error) {
+      console.error('Error updating ticket:', error);
+      return { data: null, error };
+    }
+
+    return { data, error: null };
+  } catch (error) {
+    console.error('Error in updateTicket:', error);
+    return { data: null, error };
+  }
+}
+
+export const assignTicket = async (ticketId, { assigneeType, assignedTo }) => {
+  try {
+    const { data, error } = await supabase
+      .from('tickets')
       .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
+        assignee_type: assigneeType,
+        assigned_to: assignedTo
       })
       .eq('id', ticketId)
-      .select()
+      .select(`
+        *,
+        creator:profiles!creator_id(*),
+        assignee:profiles(*)
+      `)
+      .single();
 
-    return { data, error }
+    if (error) {
+      console.error('Error assigning ticket:', error);
+      return { data: null, error };
+    }
+
+    return { data, error: null };
   } catch (error) {
-    console.error('Error updating ticket:', error)
-    return { data: null, error }
+    console.error('Error in assignTicket:', error);
+    return { data: null, error };
   }
 }
 
@@ -430,7 +473,7 @@ export const getRecentActivities = async (page = 1, pageSize = 15) => {
           status,
           created_at,
           creator:profiles!tickets_creator_id_fkey(id, full_name),
-          assignee:profiles!tickets_assignee_id_fkey(id, full_name)
+          assignee:profiles(id, full_name)
         `)
         .order('created_at', { ascending: false })
         .range(offset, offset + pageSize - 1),
@@ -449,9 +492,6 @@ export const getRecentActivities = async (page = 1, pageSize = 15) => {
         .range(offset, offset + pageSize - 1)
     ])
 
-    console.log('Tickets response:', ticketsResponse)
-    console.log('Comments response:', commentsResponse)
-
     if (ticketsResponse.error) throw ticketsResponse.error
     if (commentsResponse.error) throw commentsResponse.error
 
@@ -460,9 +500,6 @@ export const getRecentActivities = async (page = 1, pageSize = 15) => {
       supabase.from('tickets').select('*', { count: 'exact', head: true }),
       supabase.from('comments').select('*', { count: 'exact', head: true })
     ])
-
-    console.log('Tickets count:', ticketsCount)
-    console.log('Comments count:', commentsCount)
 
     const totalTickets = ticketsCount || 0
     const totalComments = commentsCount || 0
@@ -492,8 +529,6 @@ export const getRecentActivities = async (page = 1, pageSize = 15) => {
       }))
     ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     .slice(0, pageSize)
-
-    console.log('Combined activities:', activities)
 
     return { 
       data: activities, 
@@ -647,5 +682,21 @@ export const getAgentStats = async (agentId) => {
   } catch (error) {
     console.error('Error fetching agent stats:', error)
     return { data: null, error }
+  }
+}
+
+// Simple function to get teams
+export const getTeams = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('teams')
+      .select('*')
+      .order('name');
+
+    if (error) throw error;
+    return { data, error: null };
+  } catch (error) {
+    console.error('Error fetching teams:', error);
+    return { data: null, error };
   }
 } 
