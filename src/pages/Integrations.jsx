@@ -29,12 +29,6 @@ const INTEGRATION_PROVIDERS = [
     icon: <svg viewBox="0 0 24 24" className="w-8 h-8" fill="#F22F46"><path d="M12 0C5.383 0 0 5.383 0 12s5.383 12 12 12 12-5.383 12-12S18.617 0 12 0zm0 4.92a2.04 2.04 0 110 4.08 2.04 2.04 0 010-4.08zm5.04 2.04a2.04 2.04 0 110 4.08 2.04 2.04 0 010-4.08zm-10.08 0a2.04 2.04 0 110 4.08 2.04 2.04 0 010-4.08zm5.04 5.04a2.04 2.04 0 110 4.08 2.04 2.04 0 010-4.08zm5.04 2.04a2.04 2.04 0 110 4.08 2.04 2.04 0 010-4.08zm-10.08 0a2.04 2.04 0 110 4.08 2.04 2.04 0 010-4.08z"/></svg>
   },
   {
-    id: 'hubspot',
-    name: 'HubSpot',
-    description: 'CRM and marketing automation',
-    icon: <svg viewBox="0 0 24 24" className="w-8 h-8" fill="#FF7A59"><path d="M22.447 9.588h-.565c-.452 0-.818-.367-.818V6.235a.818.818 0 0 1 .818-.818h.565a.818.818 0 0 1 .818.818V8.77a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818V6.235c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818V8.77a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818V6.235c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818V8.77a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818V6.235c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818V8.77a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818V6.235c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818V8.77a.818.818 0 0 1-.818.818zm19.765 3.953h-.565a.818.818 0 0 1-.818-.818v-2.535c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818v2.535a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818v-2.535c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818v2.535a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818v-2.535c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818v2.535a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818v-2.535c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818v2.535a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818v-2.535c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818v2.535a.818.818 0 0 1-.818.818z"/></svg>
-  },
-  {
     id: 'google-analytics',
     name: 'Google Analytics',
     description: 'Track user behavior and metrics',
@@ -223,16 +217,6 @@ export default function Integrations() {
             {renderField('Auth Token', 'credential_auth_token', 'password')}
             {renderField('Phone Number', 'phone_number', 'tel')}
             {renderField('Message Template', 'message_template', 'textarea')}
-          </div>
-        )
-
-      case 'hubspot':
-        return (
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Configure HubSpot Integration</h3>
-            {renderField('API Key', 'credential_api_key', 'password')}
-            {renderField('Portal ID', 'portal_id')}
-            {renderField('Pipeline Name', 'pipeline_name')}
           </div>
         )
 

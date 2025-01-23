@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, Filter, Search, Calendar, User, X, MessageSquare, Clock, AlertCircle, ChevronUp, ChevronDown } from 'lucide-react'
-import { getTickets, createTicket, getTicketComments, updateTicket, createComment, getTags, getTagsForTicket, addTagToTicket, removeTagFromTicket, getOrganizationUsers } from '../lib/database'
+import { Plus, Filter, Search, Calendar, User, X, MessageSquare, Clock, AlertCircle, ChevronUp, ChevronDown, Users } from 'lucide-react'
+import { getTickets, createTicket, getTicketComments, updateTicket, createComment, getTags, getTagsForTicket, addTagToTicket, removeTagFromTicket, getOrganizationUsers, getTeams, assignTicket } from '../lib/database'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function Tickets() {
@@ -32,11 +32,13 @@ export default function Tickets() {
     key: 'created_at',
     direction: 'desc'
   })
+  const [availableTeams, setAvailableTeams] = useState([])
 
   useEffect(() => {
     loadTickets()
     loadAvailableTags()
     loadOrganizationUsers()
+    loadTeams()
   }, [])
 
   useEffect(() => {
@@ -113,6 +115,15 @@ export default function Tickets() {
     }
   }
 
+  const loadTeams = async () => {
+    const { data, error } = await getTeams()
+    if (error) {
+      console.error('Error loading teams:', error)
+      return
+    }
+    setAvailableTeams(data)
+  }
+
   const handleTicketClick = (ticket) => {
     console.log('Ticket data in table:', ticket);
     setSelectedTicket(ticket)
@@ -131,14 +142,26 @@ export default function Tickets() {
     }
   }
 
-  const handleAssigneeChange = async (ticketId, newAssigneeId) => {
-    const { error } = await updateTicket(ticketId, { assignee_id: newAssigneeId })
-    if (error) {
-      console.error('Error updating ticket assignee:', error)
-    } else {
-      // Dispatch custom event to trigger sidebar update
-      window.dispatchEvent(new CustomEvent('ticketUpdated'))
-      loadTickets() // Refresh the list
+  const handleAssignment = async (value) => {
+    try {
+      // Parse the composite value (format: "type:id")
+      const [assigneeType, assignedTo] = value ? value.split(':') : [null, null]
+      
+      const { data, error } = await assignTicket(selectedTicket.id, {
+        assigneeType,
+        assignedTo
+      })
+
+      if (error) {
+        console.error('Error assigning ticket:', error)
+      } else {
+        setSelectedTicket(data)
+        // Dispatch custom event to trigger sidebar update
+        window.dispatchEvent(new CustomEvent('ticketUpdated'))
+        loadTickets() // Refresh the list
+      }
+    } catch (error) {
+      console.error('Error in ticket assignment:', error)
     }
   }
 
@@ -371,26 +394,16 @@ export default function Tickets() {
                       <th 
                         scope="col" 
                         className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-32"
-                        onClick={() => handleSort('creator')}
-                      >
-                        <div className="flex items-center">
-                          Creator
-                          {getSortIcon('creator')}
-                        </div>
-                      </th>
-                      <th 
-                        scope="col" 
-                        className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-32"
                         onClick={() => handleSort('assignee')}
                       >
                         <div className="flex items-center">
-                          Assignee
+                          Assigned To
                           {getSortIcon('assignee')}
                         </div>
                       </th>
                       <th 
                         scope="col" 
-                        className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-32"
+                        className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-48"
                         onClick={() => handleSort('created_at')}
                       >
                         <div className="flex items-center">
@@ -439,23 +452,29 @@ export default function Tickets() {
                             </span>
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="text-xs text-gray-900">
-                                {ticket.creator?.full_name}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap">
                             <div className="text-xs text-gray-900">
-                              {ticket.assignee?.full_name || (
+                              {ticket.assignee_type === 'user' ? (
+                                <div className="flex items-center">
+                                  <User className="h-4 w-4 mr-1 text-gray-400" />
+                                  <span>{ticket.assigned_user?.full_name}</span>
+                                </div>
+                              ) : ticket.assignee_type === 'team' ? (
+                                <div className="flex items-center">
+                                  <Users className="h-4 w-4 mr-1 text-gray-400" />
+                                  <span>{ticket.assigned_team?.name}</span>
+                                </div>
+                              ) : (
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                                   Unassigned
                                 </span>
                               )}
                             </div>
                           </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">
-                            {new Date(ticket.created_at).toLocaleDateString()}
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            <div className="flex items-center text-xs">
+                              <span className="text-gray-700">{new Date(ticket.created_at).toLocaleDateString()}</span>
+                              <span className="text-[11px] text-gray-400 ml-1">by {ticket.creator?.full_name}</span>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -515,18 +534,29 @@ export default function Tickets() {
                         <option value="closed">Closed</option>
                       </select>
                       <select
-                        value={selectedTicket.assignee_id || ''}
-                        onChange={(e) => handleAssigneeChange(selectedTicket.id, e.target.value)}
+                        value={selectedTicket.assignee_type && selectedTicket.assigned_to 
+                          ? `${selectedTicket.assignee_type}:${selectedTicket.assigned_to}`
+                          : ''}
+                        onChange={(e) => handleAssignment(e.target.value)}
                         className="inline-flex justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                       >
                         <option value="">Unassigned</option>
-                        {organizationUsers
-                          .filter(user => ['admin', 'agent'].includes(user.role))
-                          .map((user) => (
-                            <option key={user.id} value={user.id}>
-                              {user.full_name}
+                        <optgroup label="Users">
+                          {organizationUsers
+                            .filter(user => ['admin', 'agent'].includes(user.role))
+                            .map((user) => (
+                              <option key={user.id} value={`user:${user.id}`}>
+                                👤 {user.full_name}
+                              </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Teams">
+                          {availableTeams.map((team) => (
+                            <option key={team.id} value={`team:${team.id}`}>
+                              👥 {team.name}
                             </option>
-                      ))}
+                          ))}
+                        </optgroup>
                       </select>
                       <span className={`inline-flex items-center px-3 py-2 rounded-md text-sm font-medium ${priorityColors[selectedTicket.priority]}`}>
                         {selectedTicket.priority}
