@@ -294,9 +294,9 @@ export default function Dashboard() {
       {/* Recent Activity */}
       <div className="mt-8">
         <div className="rounded-lg bg-white shadow">
-          <div className="p-6">
+          <div className="p-5">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium leading-6 text-gray-900">
+              <h3 className="text-md font-medium leading-6 text-gray-900">
                 Recent Activity
               </h3>
               {metadata && (
@@ -307,8 +307,44 @@ export default function Dashboard() {
                 </span>
               )}
             </div>
-            <div className="mt-4 flow-root max-h-[calc(100vh-24rem)] overflow-y-auto">
-              <ul className="-mb-8">
+
+            {/* Pagination */}
+            {metadata && metadata.totalPages > 1 && (
+              <div className="mt-3 flex items-center justify-between">
+                <div className="flex flex-1 justify-between items-center">
+                  <button
+                    onClick={handlePreviousPage}
+                    disabled={currentPage === 1}
+                    className={`relative inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md ${
+                      currentPage === 1
+                        ? 'text-gray-300 cursor-not-allowed'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5 mr-1.5" />
+                    Previous
+                  </button>
+                  <span className="text-sm text-gray-700">
+                    Page {currentPage} of {metadata.totalPages}
+                  </span>
+                  <button
+                    onClick={handleNextPage}
+                    disabled={currentPage >= metadata.totalPages}
+                    className={`relative inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md ${
+                      currentPage >= metadata.totalPages
+                        ? 'text-gray-300 cursor-not-allowed'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Next
+                    <ChevronRight className="h-3.5 w-3.5 ml-1.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-3 flow-root">
+              <ul>
                 {loading ? (
                   <li className="text-sm text-gray-500">Loading activities...</li>
                 ) : activities.length === 0 ? (
@@ -316,26 +352,20 @@ export default function Dashboard() {
                 ) : (
                   activities.map((activity, activityIdx) => (
                     <li key={activity.id}>
-                      <div className="relative pb-8">
-                        {activityIdx !== activities.length - 1 ? (
-                          <span
-                            className="absolute left-5 top-5 -ml-px h-full w-0.5 bg-gray-200"
-                            aria-hidden="true"
-                          />
-                        ) : null}
-                        <div className="relative flex items-start space-x-3">
+                      <div className="relative pb-3">
+                        <div className="relative flex items-start space-x-2">
                           <div className="relative">
                             {getActivityIcon(activity.type)}
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="text-sm text-gray-500">
                               {getActivityMessage(activity)}
-                              <span className="whitespace-nowrap ml-2">
+                              <span className="whitespace-nowrap ml-1.5">
                                 {new Date(activity.created_at).toLocaleString()}
                               </span>
                             </div>
                             {activity.type === 'comment_added' && !activity.is_internal && (
-                              <div className="mt-2 text-sm text-gray-700">
+                              <div className="mt-1 text-sm text-gray-700">
                                 {activity.content}
                               </div>
                             )}
@@ -347,41 +377,6 @@ export default function Dashboard() {
                 )}
               </ul>
             </div>
-
-            {/* Pagination */}
-            {metadata && metadata.totalPages > 1 && (
-              <div className="mt-4 flex items-center justify-between border-t border-gray-200 pt-4">
-                <div className="flex flex-1 justify-between items-center">
-                  <button
-                    onClick={handlePreviousPage}
-                    disabled={currentPage === 1}
-                    className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                      currentPage === 1
-                        ? 'text-gray-300 cursor-not-allowed'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    <ChevronLeft className="h-4 w-4 mr-2" />
-                    Previous
-                  </button>
-                  <span className="text-sm text-gray-700">
-                    Page {currentPage} of {metadata.totalPages}
-                  </span>
-                  <button
-                    onClick={handleNextPage}
-                    disabled={currentPage >= metadata.totalPages}
-                    className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                      currentPage >= metadata.totalPages
-                        ? 'text-gray-300 cursor-not-allowed'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4 ml-2" />
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

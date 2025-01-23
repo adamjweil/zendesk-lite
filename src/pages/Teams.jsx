@@ -12,6 +12,7 @@ export default function Teams() {
   const [showTeamModal, setShowTeamModal] = useState(false)
   const [showMembersModal, setShowMembersModal] = useState(false)
   const [selectedTeam, setSelectedTeam] = useState(null)
+  const [isEditing, setIsEditing] = useState(false)
   const [teamForm, setTeamForm] = useState({
     name: '',
     description: '',
@@ -94,27 +95,55 @@ export default function Teams() {
     try {
       setError(null)
 
-      const { data, error } = await supabase
-        .from('teams')
-        .insert([{
-          ...teamForm,
-          organization_id: profile.organization.id
-        }])
-        .select()
-        .single()
+      if (isEditing && selectedTeam) {
+        const { data, error } = await supabase
+          .from('teams')
+          .update({
+            name: teamForm.name,
+            description: teamForm.description,
+            leader_id: teamForm.leader_id
+          })
+          .eq('id', selectedTeam.id)
+          .select()
+          .single()
 
-      if (error) throw error
+        if (error) throw error
+      } else {
+        const { data, error } = await supabase
+          .from('teams')
+          .insert([{
+            ...teamForm,
+            organization_id: profile.organization.id
+          }])
+          .select()
+          .single()
+
+        if (error) throw error
+      }
 
       // Reset form and close modal
       setTeamForm({ name: '', description: '', leader_id: '' })
       setShowTeamModal(false)
+      setIsEditing(false)
+      setSelectedTeam(null)
       
-      // Reload data to show new team
+      // Reload data to show updated team
       await loadData()
     } catch (error) {
-      console.error('Error creating team:', error)
-      setError('Failed to create team')
+      console.error('Error managing team:', error)
+      setError(isEditing ? 'Failed to update team' : 'Failed to create team')
     }
+  }
+
+  const handleEditTeam = (team) => {
+    setTeamForm({
+      name: team.name,
+      description: team.description || '',
+      leader_id: team.leader?.id || ''
+    })
+    setSelectedTeam(team)
+    setIsEditing(true)
+    setShowTeamModal(true)
   }
 
   const handleDeleteTeam = async (teamId) => {
@@ -271,6 +300,12 @@ export default function Teams() {
                       <Users className="h-3 w-3" />
                     </button>
                     <button
+                      onClick={() => handleEditTeam(team)}
+                      className="btn btn-xs btn-ghost"
+                    >
+                      <Edit2 className="h-3 w-3" />
+                    </button>
+                    <button
                       onClick={() => handleDeleteTeam(team.id)}
                       className="btn btn-xs btn-ghost text-red-600 hover:text-red-800"
                     >
@@ -331,11 +366,11 @@ export default function Teams() {
         </div>
       </div>
 
-      {/* Create Team Modal */}
+      {/* Create/Edit Team Modal */}
       {showTeamModal && (
         <div className="modal modal-open">
           <div className="modal-box max-w-sm">
-            <h3 className="font-bold text-sm">Create Team</h3>
+            <h3 className="font-bold text-sm">{isEditing ? 'Edit' : 'Create'} Team</h3>
             <form onSubmit={handleCreateTeam} className="mt-2">
               <div className="form-control">
                 <label className="label py-0.5">
@@ -402,12 +437,17 @@ export default function Teams() {
                 <button
                   type="button"
                   className="btn btn-xs"
-                  onClick={() => setShowTeamModal(false)}
+                  onClick={() => {
+                    setShowTeamModal(false)
+                    setIsEditing(false)
+                    setSelectedTeam(null)
+                    setTeamForm({ name: '', description: '', leader_id: '' })
+                  }}
                 >
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-xs btn-primary">
-                  Create Team
+                  {isEditing ? 'Update' : 'Create'} Team
                 </button>
               </div>
             </form>
