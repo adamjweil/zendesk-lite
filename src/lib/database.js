@@ -416,7 +416,7 @@ export const updateUserRole = async (userId, role) => {
 }
 
 // Recent Activity operations
-export const getRecentActivities = async (page = 1, pageSize = 10) => {
+export const getRecentActivities = async (page = 1, pageSize = 15) => {
   try {
     const offset = (page - 1) * pageSize
 
