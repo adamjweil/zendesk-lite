@@ -265,13 +265,21 @@ export const getTickets = async (filters = {}) => {
     // First get tickets
     const query = supabase
       .from('tickets')
-      .select('*')
+      .select(`
+        *,
+        creator:profiles!tickets_creator_id_fkey(*)
+      `)
       .order('created_at', { ascending: false });
 
     // Apply filters
     Object.entries(filters).forEach(([key, value]) => {
       if (value) {
-        query.eq(key, value);
+        // Map assignee_id to the new assignment system
+        if (key === 'assignee_id') {
+          query.eq('assignee_type', 'user').eq('assigned_to', value);
+        } else {
+          query.eq(key, value);
+        }
       }
     });
 
