@@ -12,7 +12,8 @@ import {
   PlusCircle,
   BarChart2,
   Settings,
-  Plug
+  Plug,
+  UsersRound
 } from 'lucide-react'
 import { getTickets } from '../lib/database'
 

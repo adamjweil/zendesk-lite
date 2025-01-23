@@ -15,6 +15,7 @@ import TicketDetails from './pages/TicketDetails'
 import Analytics from './pages/Analytics'
 import SubmitIssue from './pages/SubmitIssue'
 import Integrations from './pages/Integrations'
+import Teams from './pages/Teams'
 
 function App() {
   return (
@@ -39,6 +40,7 @@ function App() {
             <Route index element={<Dashboard />} />
             <Route path="profile" element={<Profile />} />
             <Route path="users" element={<Users />} />
+            <Route path="teams" element={<Teams />} />
             <Route path="tickets" element={<Tickets />} />
             <Route path="tickets/:ticketId" element={<TicketDetails />} />
             <Route path="analytics" element={<Analytics />} />

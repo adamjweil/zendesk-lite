@@ -32,7 +32,7 @@ const INTEGRATION_PROVIDERS = [
     id: 'hubspot',
     name: 'HubSpot',
     description: 'CRM and marketing automation',
-    icon: <svg viewBox="0 0 24 24" className="w-8 h-8" fill="#FF7A59"><path d="M22.447 9.588h-.565c-.452 0-.818-.367-.818-.818V6.235a.818.818 0 0 1 .818-.818h.565a.818.818 0 0 1 .818.818V8.77a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818V6.235c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818V8.77a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818V6.235c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818V8.77a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818V6.235c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818V8.77a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818V6.235c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818V8.77a.818.818 0 0 1-.818.818zm19.765 3.953h-.565a.818.818 0 0 1-.818-.818v-2.535c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818v2.535a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818v-2.535c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818v2.535a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818v-2.535c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818v2.535a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818v-2.535c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818v2.535a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818v-2.535c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818v2.535a.818.818 0 0 1-.818.818z"/></svg>
+    icon: <svg viewBox="0 0 24 24" className="w-8 h-8" fill="#FF7A59"><path d="M22.447 9.588h-.565c-.452 0-.818-.367-.818V6.235a.818.818 0 0 1 .818-.818h.565a.818.818 0 0 1 .818.818V8.77a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818V6.235c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818V8.77a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818V6.235c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818V8.77a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818V6.235c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818V8.77a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818V6.235c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818V8.77a.818.818 0 0 1-.818.818zm19.765 3.953h-.565a.818.818 0 0 1-.818-.818v-2.535c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818v2.535a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818v-2.535c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818v2.535a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818v-2.535c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818v2.535a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818v-2.535c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818v2.535a.818.818 0 0 1-.818.818zm-3.953 0h-.565a.818.818 0 0 1-.818-.818v-2.535c0-.452.367-.818.818-.818h.565c.452 0 .818.367.818.818v2.535a.818.818 0 0 1-.818.818z"/></svg>
   },
   {
     id: 'google-analytics',
@@ -335,13 +335,12 @@ export default function Integrations() {
               {provider.icon}
             </div>
             <div className="flex-1 min-w-0">
-              <a href="#" className="focus:outline-none">
-                <span className="absolute inset-0" aria-hidden="true" />
+              <div className="focus:outline-none">
                 <p className="text-sm font-medium text-gray-900">{provider.name}</p>
                 <p className="text-sm text-gray-500 truncate">
                   {provider.description}
                 </p>
-              </a>
+              </div>
             </div>
             <button
               onClick={() => handleAddIntegration(provider.id)}
@@ -398,26 +397,64 @@ export default function Integrations() {
 
       {/* Configuration Modal */}
       {configuring && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-8 max-w-md w-full">
-            {renderConfigurationForm()}
-            <div className="mt-6 flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setConfiguring(false)
-                  setSelectedProvider('')
-                  setFormData({})
-                }}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveIntegration}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Save
-              </button>
+        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            {/* Background overlay */}
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+
+            {/* Modal panel */}
+            <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+              <div className="absolute top-0 right-0 pt-4 pr-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfiguring(false);
+                    setSelectedProvider('');
+                    setFormData({});
+                  }}
+                  className="bg-white rounded-md text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  <span className="sr-only">Close</span>
+                  <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="mt-3 text-center sm:mt-0 sm:text-left">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="flex-shrink-0">
+                    {INTEGRATION_PROVIDERS.find(p => p.id === selectedProvider)?.icon}
+                  </div>
+                  <h3 className="text-lg font-medium leading-6 text-gray-900">
+                    Configure {INTEGRATION_PROVIDERS.find(p => p.id === selectedProvider)?.name}
+                  </h3>
+                </div>
+                <div className="mt-2">
+                  {renderConfigurationForm()}
+                </div>
+              </div>
+
+              <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={handleSaveIntegration}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfiguring(false);
+                    setSelectedProvider('');
+                    setFormData({});
+                  }}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:w-auto sm:text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </div>

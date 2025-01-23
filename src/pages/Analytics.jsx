@@ -61,6 +61,7 @@ export default function Analytics() {
   const isAdmin = profile?.role === 'admin'
   const [agentMetricOrder, setAgentMetricOrder] = useState(['open', 'closed', 'timeOpen', 'timeClose'])
   const [adminMetricOrder, setAdminMetricOrder] = useState(['new', 'total', 'open', 'closed'])
+  const [chartOrder, setChartOrder] = useState(['priority', 'status', 'assignee', 'trend'])
 
   useEffect(() => {
     loadMetrics()
@@ -115,14 +116,36 @@ export default function Analytics() {
   const onDragEnd = (result) => {
     if (!result.destination) return
 
-    const items = isAdmin ? [...adminMetricOrder] : [...agentMetricOrder]
+    const listType = result.source.droppableId
+    let items
+    
+    switch(listType) {
+      case 'adminMetrics':
+        items = [...adminMetricOrder]
+        break
+      case 'agentMetrics':
+        items = [...agentMetricOrder]
+        break
+      case 'charts':
+        items = [...chartOrder]
+        break
+      default:
+        return
+    }
+
     const [reorderedItem] = items.splice(result.source.index, 1)
     items.splice(result.destination.index, 0, reorderedItem)
 
-    if (isAdmin) {
-      setAdminMetricOrder(items)
-    } else {
-      setAgentMetricOrder(items)
+    switch(listType) {
+      case 'adminMetrics':
+        setAdminMetricOrder(items)
+        break
+      case 'agentMetrics':
+        setAgentMetricOrder(items)
+        break
+      case 'charts':
+        setChartOrder(items)
+        break
     }
   }
 
@@ -165,7 +188,7 @@ export default function Analytics() {
         value: metrics?.total_tickets || 0
       },
       new: {
-        title: "New Tickets (24hrs)",
+        title: "New Tickets",
         value: metrics?.new_tickets || 0,
       },
       open: {
@@ -186,6 +209,146 @@ export default function Analytics() {
         {...metricMap[id]}
       />
     ))
+  }
+
+  const getChartComponent = (chartId, index) => {
+    const charts = {
+      priority: (
+        <Draggable key="priority" draggableId="priority" index={index}>
+          {(provided, snapshot) => (
+            <div
+              ref={provided.innerRef}
+              {...provided.draggableProps}
+              {...provided.dragHandleProps}
+              className="bg-white p-4 rounded-lg shadow"
+            >
+              <h3 className="text-sm font-medium text-gray-900 mb-2">Tickets by Priority</h3>
+              <div className="h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={Object.entries(metrics?.tickets_by_priority || {}).map(([name, value], index) => ({
+                        name,
+                        value,
+                        fill: COLORS[index % COLORS.length]
+                      }))}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      label
+                    />
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+        </Draggable>
+      ),
+      status: (
+        <Draggable key="status" draggableId="status" index={index}>
+          {(provided, snapshot) => (
+            <div
+              ref={provided.innerRef}
+              {...provided.draggableProps}
+              {...provided.dragHandleProps}
+              className="bg-white p-4 rounded-lg shadow"
+            >
+              <h3 className="text-sm font-medium text-gray-900 mb-2">Tickets by Status</h3>
+              <div className="h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={Object.entries(metrics?.tickets_by_status || {}).map(([name, value]) => ({
+                      name,
+                      value
+                    }))}
+                    margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="value" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+        </Draggable>
+      ),
+      assignee: (
+        <Draggable key="assignee" draggableId="assignee" index={index}>
+          {(provided, snapshot) => (
+            <div
+              ref={provided.innerRef}
+              {...provided.draggableProps}
+              {...provided.dragHandleProps}
+              className="bg-white p-4 rounded-lg shadow"
+            >
+              <h3 className="text-sm font-medium text-gray-900 mb-2">Tickets by Assignee</h3>
+              <div className="h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={Object.entries(metrics?.tickets_by_assignee || {}).map(([name, value], index) => ({
+                        name,
+                        value,
+                        fill: COLORS[index % COLORS.length]
+                      }))}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      label
+                    />
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+        </Draggable>
+      ),
+      trend: (
+        <Draggable key="trend" draggableId="trend" index={index}>
+          {(provided, snapshot) => (
+            <div
+              ref={provided.innerRef}
+              {...provided.draggableProps}
+              {...provided.dragHandleProps}
+              className="bg-white p-4 rounded-lg shadow"
+            >
+              <h3 className="text-sm font-medium text-gray-900 mb-2">Daily Ticket Trend</h3>
+              <div className="h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={metrics?.daily_ticket_counts || []}
+                    margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="date"
+                      tickFormatter={(date) => new Date(date).toLocaleDateString()}
+                    />
+                    <YAxis />
+                    <Tooltip
+                      labelFormatter={(date) => new Date(date).toLocaleDateString()}
+                    />
+                    <Line type="monotone" dataKey="count" stroke="#8884d8" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+        </Draggable>
+      )
+    }
+    return charts[chartId]
   }
 
   if (loading) {
@@ -231,105 +394,23 @@ export default function Analytics() {
               </Droppable>
 
               {/* Charts */}
-              <div className="grid grid-cols-2 gap-4">
-                {/* Priority Distribution */}
-                <div className="bg-white p-4 rounded-lg shadow">
-                  <h3 className="text-sm font-medium text-gray-900 mb-2">Tickets by Priority</h3>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={Object.entries(metrics?.tickets_by_priority || {}).map(([name, value], index) => ({
-                            name,
-                            value,
-                            fill: COLORS[index % COLORS.length]
-                          }))}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          label
-                        />
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
+              <Droppable droppableId="charts" direction="horizontal">
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className="grid grid-cols-2 gap-4"
+                    style={{
+                      background: snapshot.isDraggingOver ? '#f3f4f6' : 'transparent',
+                      padding: '8px',
+                      borderRadius: '8px'
+                    }}
+                  >
+                    {chartOrder.map((chartId, index) => getChartComponent(chartId, index))}
+                    {provided.placeholder}
                   </div>
-                </div>
-
-                {/* Status Distribution */}
-                <div className="bg-white p-4 rounded-lg shadow">
-                  <h3 className="text-sm font-medium text-gray-900 mb-2">Tickets by Status</h3>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={Object.entries(metrics?.tickets_by_status || {}).map(([name, value]) => ({
-                          name,
-                          value
-                        }))}
-                        margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="value" fill="#8884d8" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-
-                {/* Assignee Distribution */}
-                <div className="bg-white p-4 rounded-lg shadow">
-                  <h3 className="text-sm font-medium text-gray-900 mb-2">Tickets by Assignee</h3>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={Object.entries(metrics?.tickets_by_assignee || {}).map(([name, value], index) => ({
-                            name,
-                            value,
-                            fill: COLORS[index % COLORS.length]
-                          }))}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          label
-                        />
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-
-                {/* Daily Ticket Trend */}
-                <div className="bg-white p-4 rounded-lg shadow">
-                  <h3 className="text-sm font-medium text-gray-900 mb-2">Daily Ticket Trend</h3>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart
-                        data={metrics?.daily_ticket_counts || []}
-                        margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          dataKey="date"
-                          tickFormatter={(date) => new Date(date).toLocaleDateString()}
-                        />
-                        <YAxis />
-                        <Tooltip
-                          labelFormatter={(date) => new Date(date).toLocaleDateString()}
-                        />
-                        <Line type="monotone" dataKey="count" stroke="#8884d8" />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </div>
+                )}
+              </Droppable>
             </div>
           ) : (
             <div className="h-[calc(100vh-12rem)]">

@@ -338,10 +338,10 @@ export default function Tickets() {
                     <tr>
                       <th 
                         scope="col" 
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48"
+                        className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48"
                       >
                         <div className="relative">
-                          <div className="flex items-center cursor-pointer hover:bg-gray-100 p-1 rounded mb-1" onClick={() => handleSort('status')}>
+                          <div className="flex items-center cursor-pointer hover:bg-gray-100 p-1 rounded" onClick={() => handleSort('status')}>
                             Status
                             {getSortIcon('status')}
                           </div>
@@ -349,7 +349,7 @@ export default function Tickets() {
                       </th>
                       <th 
                         scope="col" 
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                         onClick={() => handleSort('subject')}
                       >
                         <div className="flex items-center">
@@ -359,10 +359,10 @@ export default function Tickets() {
                       </th>
                       <th 
                         scope="col" 
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48"
+                        className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48"
                       >
                         <div className="relative">
-                          <div className="flex items-center cursor-pointer hover:bg-gray-100 p-1 rounded mb-1" onClick={() => handleSort('priority')}>
+                          <div className="flex items-center cursor-pointer hover:bg-gray-100 p-1 rounded" onClick={() => handleSort('priority')}>
                             Priority
                             {getSortIcon('priority')}
                           </div>
@@ -370,31 +370,31 @@ export default function Tickets() {
                       </th>
                       <th 
                         scope="col" 
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-32"
                         onClick={() => handleSort('creator')}
                       >
                         <div className="flex items-center">
-                          Created By
+                          Creator
                           {getSortIcon('creator')}
                         </div>
                       </th>
                       <th 
                         scope="col" 
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-32"
                         onClick={() => handleSort('assignee')}
                       >
                         <div className="flex items-center">
-                          Assigned To
+                          Assignee
                           {getSortIcon('assignee')}
                         </div>
                       </th>
                       <th 
                         scope="col" 
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-32"
                         onClick={() => handleSort('created_at')}
                       >
                         <div className="flex items-center">
-                          Created At
+                          Created
                           {getSortIcon('created_at')}
                         </div>
                       </th>
@@ -403,13 +403,13 @@ export default function Tickets() {
                   <tbody className="bg-white divide-y divide-gray-200 overflow-y-auto">
                     {loading ? (
                       <tr>
-                        <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                        <td colSpan="5" className="px-3 py-2 text-center text-gray-500">
                           Loading tickets...
                         </td>
                       </tr>
                     ) : tickets.length === 0 ? (
                       <tr>
-                        <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                        <td colSpan="5" className="px-3 py-2 text-center text-gray-500">
                           No tickets found
                         </td>
                       </tr>
@@ -420,41 +420,41 @@ export default function Tickets() {
                           className="hover:bg-gray-50 cursor-pointer"
                           onClick={() => handleTicketClick(ticket)}
                         >
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColors[ticket.status]}`}>
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            <span className={`px-2 inline-flex text-xs leading-4 font-semibold rounded-full ${statusColors[ticket.status]}`}>
                               {ticket.status}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-primary">
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            <div className="text-xs font-medium text-primary">
                               {ticket.subject}
                             </div>
-                            <div className="text-sm text-gray-500 truncate max-w-md">
+                            <div className="text-xs text-gray-500 truncate max-w-md">
                               {ticket.description}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${priorityColors[ticket.priority]}`}>
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            <span className={`px-2 inline-flex text-xs leading-4 font-semibold rounded-full ${priorityColors[ticket.priority]}`}>
                               {ticket.priority}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-3 py-2 whitespace-nowrap">
                             <div className="flex items-center">
-                              <div className="text-sm text-gray-900">
+                              <div className="text-xs text-gray-900">
                                 {ticket.creator?.full_name}
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            <div className="text-xs text-gray-900">
                               {ticket.assignee?.full_name || (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                                   Unassigned
                                 </span>
                               )}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">
                             {new Date(ticket.created_at).toLocaleDateString()}
                           </td>
                         </tr>

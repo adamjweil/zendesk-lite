@@ -154,36 +154,36 @@ export default function Users() {
   }
 
   return (
-    <div className="py-4">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8">
+    <div className="py-2">
+      <div className="mx-auto max-w-7xl px-2 sm:px-4 md:px-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-xl font-semibold text-gray-900">Users</h1>
+          <h1 className="text-lg font-semibold text-gray-900">Users</h1>
           <button
             onClick={() => setShowInviteModal(true)}
-            className="btn btn-sm btn-primary"
+            className="btn btn-xs btn-primary"
           >
-            <UserPlus className="h-4 w-4 mr-2" />
+            <UserPlus className="h-3 w-3 mr-1" />
             Invite User
           </button>
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8">
+      <div className="mx-auto max-w-7xl px-2 sm:px-4 md:px-6">
         {error && (
-          <div className="alert alert-error mt-4">
+          <div className="alert alert-error mt-2">
             <span className="text-sm">{error}</span>
           </div>
         )}
 
         {/* Active Users */}
-        <div className="mt-6">
-          <h2 className="text-base font-medium text-gray-900">Active Users</h2>
-          <div className="mt-3 overflow-hidden bg-white shadow sm:rounded-lg">
+        <div className="mt-3">
+          <h2 className="text-sm font-medium text-gray-900">Active Users</h2>
+          <div className="mt-2 overflow-hidden bg-white shadow sm:rounded-lg">
             <ul className="divide-y divide-gray-200">
               {users.map((user) => (
                 <li 
                   key={user.id} 
-                  className={`px-4 py-3 ${isAdmin ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+                  className={`px-3 py-2 ${isAdmin ? 'cursor-pointer hover:bg-gray-50' : ''}`}
                   onClick={() => handleUserClick(user)}
                 >
                   <div className="flex items-center justify-between">
@@ -191,7 +191,7 @@ export default function Users() {
                       <p className="text-sm font-medium text-gray-900">{user.full_name}</p>
                       <p className="text-xs text-gray-500">{user.email}</p>
                     </div>
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-3">
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${getRoleBadgeColors(user.role)}`}>
                         {user.role}
                       </span>
@@ -208,23 +208,23 @@ export default function Users() {
 
         {/* Pending Invitations */}
         {invitations.length > 0 && (
-          <div className="mt-6">
-            <h2 className="text-base font-medium text-gray-900">Pending Invitations</h2>
-            <div className="mt-3 overflow-hidden bg-white shadow sm:rounded-lg">
+          <div className="mt-3">
+            <h2 className="text-sm font-medium text-gray-900">Pending Invitations</h2>
+            <div className="mt-2 overflow-hidden bg-white shadow sm:rounded-lg">
               <ul className="divide-y divide-gray-200">
                 {invitations.map((invitation) => (
-                  <li key={invitation.id} className="px-4 py-3">
+                  <li key={invitation.id} className="px-3 py-2">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium text-gray-900">{invitation.email}</p>
                         <p className="text-xs text-gray-500 flex items-center">
                           <Mail className="h-3 w-3 mr-1" />
                           Invited by {invitation.inviter?.full_name}
-                          <Clock className="h-3 w-3 ml-3 mr-1" />
+                          <Clock className="h-3 w-3 ml-2 mr-1" />
                           Expires {new Date(invitation.expires_at).toLocaleDateString()}
                         </p>
                       </div>
-                      <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-3">
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${getRoleBadgeColors(invitation.role)}`}>
                           {invitation.role}
                         </span>
@@ -247,12 +247,12 @@ export default function Users() {
       {/* Invite Modal */}
       {showInviteModal && (
         <div className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-base">Invite User</h3>
-            <form onSubmit={handleInvite} className="mt-3">
+          <div className="modal-box max-w-sm">
+            <h3 className="font-bold text-sm">Invite User</h3>
+            <form onSubmit={handleInvite} className="mt-2">
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text text-sm">Email</span>
+                <label className="label py-0.5">
+                  <span className="label-text text-xs">Email</span>
                 </label>
                 <input
                   type="email"
@@ -262,9 +262,9 @@ export default function Users() {
                   required
                 />
               </div>
-              <div className="form-control mt-3">
-                <label className="label">
-                  <span className="label-text text-sm">Role</span>
+              <div className="form-control mt-2">
+                <label className="label py-0.5">
+                  <span className="label-text text-xs">Role</span>
                 </label>
                 <select
                   className="select select-bordered select-sm"
@@ -276,17 +276,17 @@ export default function Users() {
                   <option value="customer">Customer</option>
                 </select>
               </div>
-              <div className="modal-action">
+              <div className="modal-action mt-3">
                 <button
                   type="button"
-                  className="btn btn-sm"
+                  className="btn btn-xs"
                   onClick={() => setShowInviteModal(false)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn btn-sm btn-primary"
+                  className="btn btn-xs btn-primary"
                   disabled={inviting}
                 >
                   {inviting ? 'Sending...' : 'Send Invitation'}
@@ -301,19 +301,19 @@ export default function Users() {
       {/* User Details Modal */}
       {showUserModal && selectedUser && (
         <div className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-base">User Details</h3>
-            <div className="mt-3">
+          <div className="modal-box max-w-sm">
+            <h3 className="font-bold text-sm">User Details</h3>
+            <div className="mt-2">
               <p className="text-xs text-gray-500">Name</p>
               <p className="text-sm font-medium">{selectedUser.full_name}</p>
               
-              <p className="text-xs text-gray-500 mt-3">Email</p>
+              <p className="text-xs text-gray-500 mt-2">Email</p>
               <p className="text-sm font-medium">{selectedUser.email}</p>
 
-              <form onSubmit={handleUpdateRole} className="mt-3">
+              <form onSubmit={handleUpdateRole} className="mt-2">
                 <div className="form-control">
-                  <label className="label">
-                    <span className="label-text text-sm">Role</span>
+                  <label className="label py-0.5">
+                    <span className="label-text text-xs">Role</span>
                   </label>
                   <select
                     name="role"
@@ -325,10 +325,10 @@ export default function Users() {
                     <option value="customer">Customer</option>
                   </select>
                 </div>
-                <div className="modal-action">
+                <div className="modal-action mt-3">
                   <button
                     type="button"
-                    className="btn btn-sm"
+                    className="btn btn-xs"
                     onClick={() => {
                       setShowUserModal(false)
                       setSelectedUser(null)
@@ -338,7 +338,7 @@ export default function Users() {
                   </button>
                   <button
                     type="submit"
-                    className="btn btn-sm btn-primary"
+                    className="btn btn-xs btn-primary"
                     disabled={updating}
                   >
                     {updating ? 'Updating...' : 'Update Role'}

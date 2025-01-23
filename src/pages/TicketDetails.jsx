@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getTickets, updateTicket, getTicketComments, createComment, getOrganizationUsers } from '../lib/database'
-import { MessageSquare, Clock, AlertCircle } from 'lucide-react'
+import { MessageSquare, Clock, AlertCircle, ArrowLeft } from 'lucide-react'
 
 // Create a custom event for ticket updates
 const TICKET_UPDATED_EVENT = 'ticketUpdated'
@@ -10,6 +10,7 @@ const TICKET_UPDATED_EVENT = 'ticketUpdated'
 export default function TicketDetails() {
   const { ticketId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const { profile } = useAuth()
   const [ticket, setTicket] = useState(null)
   const [comments, setComments] = useState([])
@@ -123,6 +124,18 @@ export default function TicketDetails() {
 
   return (
     <div className="h-full flex flex-col">
+      {/* Back Button */}
+      <button
+        onClick={() => {
+          const fromDashboard = location.state?.from === 'dashboard';
+          navigate(fromDashboard ? '/' : '/tickets');
+        }}
+        className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
+      >
+        <ArrowLeft className="h-5 w-5 mr-1" />
+        Back to {location.state?.from === 'dashboard' ? 'Dashboard' : 'Tickets'}
+      </button>
+
       {/* Ticket Header */}
       <div className="bg-white shadow px-4 py-5 sm:rounded-lg sm:p-6 mb-6">
         <div className="md:flex md:items-center md:justify-between">
