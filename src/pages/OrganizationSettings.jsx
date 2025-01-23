@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { getUserProfile, updateOrganization, getTags, createTag, updateTag, deleteTag, generateSupportEmail, deleteSupportEmail } from '../lib/database'
 import { Building, Mail, Copy, X, Trash2 } from 'lucide-react'
 import Users from './Users'
+import Teams from './Teams'
 
 export default function OrganizationSettings() {
   const { user } = useAuth()
@@ -195,37 +196,37 @@ export default function OrganizationSettings() {
   }
 
   return (
-    <div className="flex">
-      <div className="flex-1 py-6">
+    <div className="flex flex-col h-screen overflow-y-auto">
+      <div className="flex-1 py-4">
         {notification && (
           <div className={`fixed top-4 right-4 z-50 max-w-sm animate-slide-in-right ${
             notification.type === 'success' ? 'bg-success/10 text-success-content' : 'bg-error/10 text-error-content'
-          } rounded-lg p-4 shadow-lg`}>
+          } rounded-lg p-3 shadow-lg`}>
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium">{notification.message}</p>
               <button
                 onClick={() => setNotification(null)}
-                className="ml-4 inline-flex text-gray-400 hover:text-gray-500 focus:outline-none"
+                className="ml-3 inline-flex text-gray-400 hover:text-gray-500 focus:outline-none"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3 w-3" />
               </button>
             </div>
           </div>
         )}
 
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8 space-y-8">
-          <div className="grid grid-cols-2 gap-8">
-            <div className="bg-base-200/50 rounded-lg p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4">
-                  <Building className="h-8 w-8 text-primary" />
-                  <h1 className="text-2xl font-semibold text-gray-900">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8 space-y-4 pb-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-base-200/50 rounded-lg p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start gap-2">
+                  <Building className="h-5 w-5 text-primary" />
+                  <h1 className="text-lg font-semibold text-gray-900">
                     Organization Settings
                   </h1>
                 </div>
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="btn btn-sm btn-primary"
+                  className="btn btn-xs btn-primary"
                   style={{ display: isEditing ? 'none' : 'block' }}
                 >
                   Edit
@@ -233,21 +234,21 @@ export default function OrganizationSettings() {
               </div>
 
               {error && (
-                <div className="alert alert-error mt-6">
-                  <span>{error}</span>
+                <div className="alert alert-error mt-2">
+                  <span className="text-sm">{error}</span>
                 </div>
               )}
 
               {!isEditing ? (
-                <div className="mt-6 space-y-6 max-w-2xl">
+                <div className="mt-3 space-y-3 max-w-2xl">
                   <div>
-                    <h3 className="text-sm font-medium text-gray-500">Organization Name</h3>
-                    <p className="mt-1 text-sm text-gray-900">{organization?.name}</p>
+                    <h3 className="text-xs font-medium text-gray-500">Organization Name</h3>
+                    <p className="mt-0.5 text-sm text-gray-900">{organization?.name}</p>
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-medium text-gray-500">Website</h3>
-                    <p className="mt-1 text-sm text-gray-900">
+                    <h3 className="text-xs font-medium text-gray-500">Website</h3>
+                    <p className="mt-0.5 text-sm text-gray-900">
                       {organization?.website ? (
                         <a href={organization.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                           {organization.website}
@@ -259,41 +260,41 @@ export default function OrganizationSettings() {
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-medium text-gray-500">Description</h3>
-                    <p className="mt-1 text-sm text-gray-900">
+                    <h3 className="text-xs font-medium text-gray-500">Description</h3>
+                    <p className="mt-0.5 text-sm text-gray-900">
                       {organization?.description || <span className="text-gray-400">No description provided</span>}
                     </p>
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-medium text-gray-500">Support Email</h3>
+                    <h3 className="text-xs font-medium text-gray-500">Support Email</h3>
                     {organization?.support_email ? (
-                      <div className="mt-1 flex items-center gap-2">
-                        <p className="text-sm text-gray-900 flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-gray-500" />
+                      <div className="mt-0.5 flex items-center gap-1">
+                        <p className="text-sm text-gray-900 flex items-center gap-1">
+                          <Mail className="h-3 w-3 text-gray-500" />
                           {organization.support_email}
                         </p>
                         <button
                           onClick={handleCopyEmail}
-                          className="btn btn-sm btn-ghost"
+                          className="btn btn-xs btn-ghost"
                           title="Copy to clipboard"
                         >
-                          <Copy className="h-4 w-4" />
+                          <Copy className="h-3 w-3" />
                         </button>
                         <button
                           onClick={handleDeleteSupportEmail}
-                          className="btn btn-sm btn-ghost text-error hover:bg-error/10"
+                          className="btn btn-xs btn-ghost text-error hover:bg-error/10"
                           title="Delete support email"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3 w-3" />
                         </button>
                       </div>
                     ) : (
-                      <div className="mt-1">
+                      <div className="mt-0.5">
                         <button
                           onClick={handleGenerateSupportEmail}
                           disabled={generatingEmail}
-                          className="btn btn-sm btn-primary"
+                          className="btn btn-xs btn-primary"
                         >
                           {generatingEmail ? 'Generating...' : 'Generate Support Email'}
                         </button>
@@ -302,14 +303,14 @@ export default function OrganizationSettings() {
                   </div>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="mt-6 space-y-6 max-w-2xl">
+                <form onSubmit={handleSubmit} className="mt-3 space-y-3 max-w-2xl">
                   <div className="form-control">
-                    <label className="label">
-                      <span className="label-text">Organization Name</span>
+                    <label className="label py-0.5">
+                      <span className="label-text text-xs">Organization Name</span>
                     </label>
                     <input
                       type="text"
-                      className="input input-bordered"
+                      className="input input-sm input-bordered"
                       value={formData.name}
                       onChange={(e) =>
                         setFormData((prev) => ({ ...prev, name: e.target.value }))
@@ -319,12 +320,12 @@ export default function OrganizationSettings() {
                   </div>
 
                   <div className="form-control">
-                    <label className="label">
-                      <span className="label-text">Website</span>
+                    <label className="label py-0.5">
+                      <span className="label-text text-xs">Website</span>
                     </label>
                     <input
                       type="url"
-                      className="input input-bordered"
+                      className="input input-sm input-bordered"
                       value={formData.website}
                       onChange={(e) =>
                         setFormData((prev) => ({ ...prev, website: e.target.value }))
@@ -334,11 +335,11 @@ export default function OrganizationSettings() {
                   </div>
 
                   <div className="form-control">
-                    <label className="label">
-                      <span className="label-text">Description</span>
+                    <label className="label py-0.5">
+                      <span className="label-text text-xs">Description</span>
                     </label>
                     <textarea
-                      className="textarea textarea-bordered h-24"
+                      className="textarea textarea-bordered h-12 text-sm"
                       value={formData.description}
                       onChange={(e) =>
                         setFormData((prev) => ({ ...prev, description: e.target.value }))
@@ -347,47 +348,10 @@ export default function OrganizationSettings() {
                     />
                   </div>
 
-                  <div className="form-control">
-                    <label className="label">
-                      <span className="label-text">Support Email</span>
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="email"
-                        className="input input-bordered flex-1"
-                        value={formData.support_email || ''}
-                        onChange={(e) =>
-                          setFormData((prev) => ({ ...prev, support_email: e.target.value }))
-                        }
-                        placeholder="Generated support email will appear here"
-                        disabled
-                      />
-                      <button
-                        type="button"
-                        onClick={handleGenerateSupportEmail}
-                        disabled={generatingEmail || saving}
-                        className="btn btn-primary"
-                      >
-                        {generatingEmail ? 'Generating...' : 'Generate New'}
-                      </button>
-                      {formData.support_email && (
-                        <button
-                          type="button"
-                          onClick={handleDeleteSupportEmail}
-                          disabled={saving}
-                          className="btn btn-ghost text-error hover:bg-error/10"
-                          title="Delete support email"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
                   <div className="flex justify-end gap-2">
                     <button
                       type="button"
-                      className="btn btn-ghost"
+                      className="btn btn-xs btn-ghost"
                       onClick={handleCancel}
                       disabled={saving}
                     >
@@ -395,7 +359,7 @@ export default function OrganizationSettings() {
                     </button>
                     <button
                       type="submit"
-                      className="btn btn-primary"
+                      className="btn btn-xs btn-primary"
                       disabled={saving}
                     >
                       {saving ? 'Saving...' : 'Save Changes'}
@@ -405,64 +369,57 @@ export default function OrganizationSettings() {
               )}
             </div>
 
-            <div className="bg-base-200/50 rounded-lg p-6">
+            <div className="bg-base-200/50 rounded-lg p-4">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold text-gray-900">Manage Tags</h2>
+                <h2 className="text-lg font-semibold text-gray-900">Manage Tags</h2>
                 <button
                   onClick={() => setShowNewTagForm(!showNewTagForm)}
-                  className="btn btn-sm btn-primary"
+                  className="btn btn-xs btn-primary"
                 >
                   {showNewTagForm ? 'Cancel' : '+ Add Tag'}
                 </button>
               </div>
 
               {showNewTagForm && (
-                <form onSubmit={handleCreateTag} className="mt-4 space-y-4">
+                <form onSubmit={handleCreateTag} className="mt-3 space-y-3">
                   <div className="form-control">
-                    <label className="label">
-                      <span className="label-text">Tag Name</span>
+                    <label className="label py-1">
+                      <span className="label-text text-xs">Tag Name</span>
                     </label>
                     <input
                       type="text"
-                      className="input input-bordered"
+                      className="input input-sm input-bordered"
                       value={newTag.name}
                       onChange={(e) => setNewTag({ ...newTag, name: e.target.value })}
                       required
                     />
                   </div>
                   <div className="form-control">
-                    <label className="label">
-                      <span className="label-text">Description</span>
+                    <label className="label py-1">
+                      <span className="label-text text-xs">Description</span>
                     </label>
                     <textarea
-                      className="textarea textarea-bordered h-24"
+                      className="textarea textarea-bordered h-16 text-sm"
                       value={newTag.description}
                       onChange={(e) => setNewTag({ ...newTag, description: e.target.value })}
                     />
                   </div>
-                  <div className="flex justify-end">
-                    <button type="submit" className="btn btn-primary">Add Tag</button>
-                    <button
-                      type="button"
-                      onClick={() => setShowNewTagForm(false)}
-                      className="btn btn-secondary ml-2"
-                    >
-                      Cancel
-                    </button>
+                  <div className="flex justify-end gap-2">
+                    <button type="submit" className="btn btn-xs btn-primary">Add Tag</button>
                   </div>
                 </form>
               )}
 
-              <ul className="mt-4">
+              <ul className="mt-3">
                 {tags.map((tag) => (
-                  <li key={tag.id} className="flex justify-between items-center py-2">
+                  <li key={tag.id} className="flex justify-between items-center py-1.5">
                     <div>
-                      <span className="font-semibold">{tag.name}</span>
-                      <span className="text-gray-600 ml-2">- {tag.description}</span>
+                      <span className="font-medium text-sm">{tag.name}</span>
+                      <span className="text-gray-600 text-xs ml-2">- {tag.description}</span>
                     </div>
                     <div className="flex space-x-2">
-                      <button onClick={() => handleUpdateTag(tag.id, { name: 'Updated Name' })} className="btn btn-sm">Edit</button>
-                      <button onClick={() => handleDeleteTag(tag.id)} className="btn btn-sm btn-error">Delete</button>
+                      <button onClick={() => handleUpdateTag(tag.id, { name: 'Updated Name' })} className="btn btn-xs">Edit</button>
+                      <button onClick={() => handleDeleteTag(tag.id)} className="btn btn-xs btn-error">Delete</button>
                     </div>
                   </li>
                 ))}
@@ -470,8 +427,12 @@ export default function OrganizationSettings() {
             </div>
           </div>
 
-          <div className="bg-base-200/50 rounded-lg p-6">
+          <div className="bg-base-200/50 rounded-lg p-4">
             <Users />
+          </div>
+
+          <div className="bg-base-200/50 rounded-lg p-4">
+            <Teams />
           </div>
         </div>
       </div>

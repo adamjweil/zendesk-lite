@@ -154,11 +154,15 @@ export default function Dashboard() {
           <h3 className="text-lg font-medium text-gray-900 mb-4">
             {profile?.role === 'agent' ? 'Assigned to Me' : 'My Open Tickets'}
           </h3>
-          <div className="overflow-hidden sm:rounded-md max-h-[300px] overflow-y-auto border border-gray-100">
+          <div className="overflow-hidden sm:rounded-md border border-gray-100">
             <ul className="divide-y divide-gray-200">
               {openTickets.map((ticket) => (
                 <li key={ticket.id}>
-                  <Link to={`/tickets/${ticket.id}`} className="block hover:bg-gray-50">
+                  <Link 
+                    to={`/tickets/${ticket.id}`}
+                    state={{ from: 'dashboard' }}
+                    className="block hover:bg-gray-50"
+                  >
                     <div className="px-4 py-4 sm:px-6">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
@@ -206,11 +210,15 @@ export default function Dashboard() {
             <h3 className="text-lg font-medium text-gray-900 mb-4">
               {profile?.role === 'agent' ? 'Recently Closed by Me' : 'My Closed Tickets'}
             </h3>
-            <div className="overflow-hidden sm:rounded-md max-h-[300px] overflow-y-auto border border-gray-100">
+            <div className="overflow-hidden sm:rounded-md border border-gray-100">
               <ul className="divide-y divide-gray-200">
                 {closedTickets.map((ticket) => (
                   <li key={ticket.id}>
-                    <Link to={`/tickets/${ticket.id}`} className="block hover:bg-gray-50">
+                    <Link 
+                      to={`/tickets/${ticket.id}`}
+                      state={{ from: 'dashboard' }}
+                      className="block hover:bg-gray-50"
+                    >
                       <div className="px-4 py-4 sm:px-6">
                         <div className="flex items-center justify-between">
                           <p className="text-sm font-medium text-gray-600 truncate">{ticket.subject}</p>
