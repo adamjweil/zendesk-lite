@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { getTickets, updateTicket, getTicketComments, createComment, getOrganizationUsers } from '../lib/database'
-import { MessageSquare, Clock, AlertCircle, ArrowLeft } from 'lucide-react'
+import { getTickets, updateTicket, getTicketComments, createComment, getOrganizationUsers, getTeams } from '../lib/database'
+import { MessageSquare, Clock, AlertCircle, ArrowLeft, User, Users } from 'lucide-react'
 
 // Create a custom event for ticket updates
 const TICKET_UPDATED_EVENT = 'ticketUpdated'
@@ -18,11 +18,22 @@ export default function TicketDetails() {
   const [newComment, setNewComment] = useState('')
   const [isInternalNote, setIsInternalNote] = useState(false)
   const [organizationUsers, setOrganizationUsers] = useState([])
+  const [availableTeams, setAvailableTeams] = useState([])
 
   useEffect(() => {
     loadTicketDetails()
     loadOrganizationUsers()
+    loadTeams()
   }, [ticketId])
+
+  const loadTeams = async () => {
+    const { data, error } = await getTeams()
+    if (error) {
+      console.error('Error loading teams:', error)
+      return
+    }
+    setAvailableTeams(data || [])
+  }
 
   const loadOrganizationUsers = async () => {
     const { data, error } = await getOrganizationUsers()
@@ -77,15 +88,30 @@ export default function TicketDetails() {
     }
   }
 
-  const handleAssigneeChange = async (newAssigneeId) => {
-    const { error } = await updateTicket(ticketId, { assignee_id: newAssigneeId })
-    if (error) {
-      console.error('Error updating ticket assignee:', error)
-    } else {
-      // Update local state and trigger sidebar update
-      setTicket(prev => ({ ...prev, assignee_id: newAssigneeId }))
-      window.dispatchEvent(new CustomEvent(TICKET_UPDATED_EVENT))
-      loadTicketDetails()
+  const handleAssigneeChange = async (value) => {
+    try {
+      // Parse the composite value (format: "type:id")
+      const [assigneeType, assignedTo] = value ? value.split(':') : [null, null]
+      
+      const { error } = await updateTicket(ticketId, { 
+        assignee_type: assigneeType,
+        assigned_to: assignedTo
+      })
+      
+      if (error) {
+        console.error('Error updating ticket assignee:', error)
+      } else {
+        // Update local state and trigger sidebar update
+        setTicket(prev => ({ 
+          ...prev, 
+          assignee_type: assigneeType,
+          assigned_to: assignedTo
+        }))
+        window.dispatchEvent(new CustomEvent(TICKET_UPDATED_EVENT))
+        loadTicketDetails()
+      }
+    } catch (error) {
+      console.error('Error in ticket assignment:', error)
     }
   }
 
@@ -167,18 +193,29 @@ export default function TicketDetails() {
               <option value="closed">Closed</option>
             </select>
             <select
-              value={ticket.assignee_id || ''}
+              value={ticket.assignee_type && ticket.assigned_to 
+                ? `${ticket.assignee_type}:${ticket.assigned_to}`
+                : ''}
               onChange={(e) => handleAssigneeChange(e.target.value)}
               className="inline-flex justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
             >
               <option value="">Unassigned</option>
-              {organizationUsers
-                .filter(user => ['admin', 'agent'].includes(user.role))
-                .map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.full_name}
+              <optgroup label="Users">
+                {organizationUsers
+                  .filter(user => ['admin', 'agent'].includes(user.role))
+                  .map((user) => (
+                    <option key={user.id} value={`user:${user.id}`}>
+                      👤 {user.full_name}
+                    </option>
+                ))}
+              </optgroup>
+              <optgroup label="Teams">
+                {availableTeams.map((team) => (
+                  <option key={team.id} value={`team:${team.id}`}>
+                    👥 {team.name}
                   </option>
-              ))}
+                ))}
+              </optgroup>
             </select>
           </div>
         </div>

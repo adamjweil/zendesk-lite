@@ -83,8 +83,8 @@ export default function Sidebar() {
       icon: Ticket,
       current: location.pathname === '/tickets',
     },
-    // Show Submit Issue to customers only
-    ...(!isAdmin && !isAgent ? [{
+    // Show Submit Issue to customers and admins
+    ...(!isAgent ? [{
       name: 'Submit Issue',
       href: '/submit-issue',
       icon: PlusCircle,
