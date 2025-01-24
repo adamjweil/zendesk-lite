@@ -42,27 +42,27 @@ A lightweight, modern customer support platform built with React and Vite. This 
 ## Screenshots
 
 ### Organization Settings
-![Organization Settings](./screenshots/organization-settings.png)
+![Organization Settings](./screenshots/organization-settings1.png)
 Manage organization details, team members, and support email configuration.
 
 ### Dashboard
-![Dashboard](./screenshots/dashboard.png)
+![Dashboard](./screenshots/dashboard1.png)
 View recent activity, ticket statistics, and important metrics.
 
 ### Analytics
-![Analytics](./screenshots/analytics.png)
+![Analytics](./screenshots/analytics1.png)
 Comprehensive analytics with ticket distribution charts and trends.
 
 ### Tickets Management
-![Tickets](./screenshots/tickets.png)
+![Tickets](./screenshots/tickets1.png)
 Powerful ticket management interface with filtering and sorting capabilities.
 
 ### AI Assistant
-![AI Assistant](./screenshots/ai_assistant.png)
+![AI Assistant](./screenshots/ai_assistant1.png)
 Smart AI-powered assistant for quick ticket inquiries and support automation.
 
 ### Integrations
-![Integrations](./screenshots/integrations.png)
+![Integrations](./screenshots/integrations1.png)
 Connect with popular third-party services to enhance your support workflow.
 
 ## Technical Stack
