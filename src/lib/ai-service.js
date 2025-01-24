@@ -144,14 +144,12 @@ const analyzeQuery = async (query) => {
         - For queries about assignments or tickets assigned to someone, use 'list' type
         
         Pay special attention to:
-        - Queries about assignments (e.g., "assigned to me", "my tickets")
+        - Queries about assignments:
+          * "assigned to me" or "my tickets" -> assignedTo: "me"
+          * "assigned to [name]" -> assignedTo: "[name]" (e.g., "Bill" -> "bill")
         - Time-based queries (e.g., "yesterday", "today", "this week")
         - Status queries (e.g., "open tickets", "closed tickets")
         - Priority queries (e.g., "high priority", "urgent tickets")
-        
-        For assignment queries:
-        - When user asks about "my tickets" or "assigned to me", set assignedTo: "me"
-        - When user asks about tickets assigned to others, set assignedTo: null
         
         Return a JSON object with the following structure:
         {
@@ -160,15 +158,15 @@ const analyzeQuery = async (query) => {
             "status": string | null,
             "priority": string | null,
             "timeRange": "day" | "week" | "month" | "year" | null,
-            "assignedTo": "me" | null
+            "assignedTo": "me" | string | null
           },
           "visualization": "none" | "bar" | "line" | "pie"
         }
         
         Example queries and responses:
         "Show my tickets" -> { queryType: "list", filters: { assignedTo: "me" } }
-        "Any tickets assigned to me?" -> { queryType: "list", filters: { assignedTo: "me" } }
-        "Were any tickets from yesterday assigned to me?" -> { queryType: "list", filters: { assignedTo: "me", timeRange: "day" } }`
+        "How many tickets are assigned to Bill?" -> { queryType: "list", filters: { assignedTo: "bill" } }
+        "Were any tickets from yesterday assigned to Adam?" -> { queryType: "list", filters: { assignedTo: "adam", timeRange: "day" } }`
       },
       {
         role: 'user',
@@ -222,60 +220,64 @@ const processQueryResults = async (results, analysis) => {
   const { data: { user } } = await supabase.auth.getUser()
   const currentUserId = user?.id
 
-  // Helper function to check if a ticket is assigned to current user
-  const isAssignedToCurrentUser = (ticket) => {
-    return ticket.metadata.assigned_to === currentUserId
+  // Helper function to check if a ticket is assigned to a specific user
+  const isAssignedToUser = async (ticket, targetUser) => {
+    if (targetUser === 'me') {
+      return ticket.metadata.assigned_to === currentUserId
+    }
+
+    try {
+      // Get the user profile by name
+      const { data: users, error } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .ilike('full_name', targetUser)
+        .limit(1)
+
+      if (error) throw error
+      
+      if (users && users.length > 0) {
+        const userId = users[0].id
+        return ticket.metadata.assigned_to === userId
+      }
+      
+      return false
+    } catch (error) {
+      console.error('Error looking up user:', error)
+      return false
+    }
   }
 
   switch (analysis.queryType) {
     case 'count':
-      if (analysis.filters?.timeRange === 'day' && analysis.filters?.assignedTo === 'me') {
-        const yesterdayTickets = filteredResults.filter(r => 
-          isYesterday(r.metadata.created_at) && isAssignedToCurrentUser(r)
-        )
-        if (yesterdayTickets.length === 0) {
-          text = 'No tickets created yesterday were assigned to you.'
-        } else {
-          text = `${yesterdayTickets.length} ticket${yesterdayTickets.length === 1 ? ' was' : 's were'} created yesterday and assigned to you:`
-          yesterdayTickets.forEach(ticket => {
-            text += `\n- ${createTicketLink(ticket)}`
-          })
-        }
-      } else if (analysis.filters?.assignedTo === 'me') {
-        const assignedTickets = filteredResults.filter(r => isAssignedToCurrentUser(r))
-        text = `You have ${assignedTickets.length} ticket${assignedTickets.length === 1 ? '' : 's'} assigned to you:`
-        assignedTickets.forEach(ticket => {
-          text += `\n- ${createTicketLink(ticket)}`
-        })
-      } else if (analysis.filters?.timeRange === 'day') {
-        const yesterdayTickets = filteredResults.filter(r => isYesterday(r.metadata.created_at))
-        if (yesterdayTickets.length === 0) {
-          text = 'No tickets were created yesterday.'
-        } else {
-          text = `${yesterdayTickets.length} ticket${yesterdayTickets.length === 1 ? ' was' : 's were'} created yesterday:`
-          yesterdayTickets.forEach(ticket => {
-            text += `\n- ${createTicketLink(ticket)}`
-          })
-        }
-      } else if (analysis.filters?.status) {
-        const statusResults = filteredResults.filter(r => r.metadata.status === analysis.filters.status)
-        text = `There are ${statusResults.length} tickets with status "${analysis.filters.status}".`
-      } else {
-        text = `There are ${filteredResults.length} tickets total.`
-      }
-      break
-
     case 'list':
       let filteredTickets = [...filteredResults]
+      
+      // Debug logging
+      console.log('Total tickets before filtering:', filteredResults.length)
+      console.log('Analysis:', analysis)
       
       // Apply time-based filters
       if (analysis.filters?.timeRange === 'day') {
         filteredTickets = filteredTickets.filter(t => isYesterday(t.metadata.created_at))
+        console.log('Tickets after time filter:', filteredTickets.length)
       }
       
       // Apply assignment filter
-      if (analysis.filters?.assignedTo === 'me') {
-        filteredTickets = filteredTickets.filter(t => isAssignedToCurrentUser(t))
+      if (analysis.filters?.assignedTo) {
+        console.log('Filtering by assignment:', analysis.filters.assignedTo)
+        // Since isAssignedToUser is now async, we need to use Promise.all
+        filteredTickets = await Promise.all(
+          filteredTickets.map(async t => ({
+            ticket: t,
+            isAssigned: await isAssignedToUser(t, analysis.filters.assignedTo)
+          }))
+        ).then(results => 
+          results
+            .filter(r => r.isAssigned)
+            .map(r => r.ticket)
+        )
+        console.log('Tickets after assignment filter:', filteredTickets.length)
       }
       
       // Apply other filters
@@ -299,19 +301,23 @@ const processQueryResults = async (results, analysis) => {
       })
 
       if (filteredTickets.length === 0) {
-        if (analysis.filters?.timeRange === 'day' && analysis.filters?.assignedTo === 'me') {
-          text = 'No tickets created yesterday were assigned to you.'
-        } else if (analysis.filters?.assignedTo === 'me') {
-          text = 'No tickets are currently assigned to you.'
-        } else if (analysis.filters?.timeRange === 'day') {
-          text = 'No tickets were created yesterday.'
+        if (analysis.filters?.assignedTo) {
+          const assignee = analysis.filters.assignedTo === 'me' ? 'you' : analysis.filters.assignedTo
+          text = `No tickets are currently assigned to ${assignee}.`
         } else {
           text = 'No tickets match your query.'
         }
       } else {
-        const assignmentContext = analysis.filters?.assignedTo === 'me' ? ' assigned to you' : ''
+        const assignee = analysis.filters?.assignedTo === 'me' ? 'you' : analysis.filters.assignedTo
+        const assignmentContext = analysis.filters?.assignedTo ? ` assigned to ${assignee}` : ''
         const timeContext = analysis.filters?.timeRange === 'day' ? ' created yesterday' : ''
-        text = `Here are ${filteredTickets.length} matching tickets${timeContext}${assignmentContext}:`
+        
+        if (analysis.queryType === 'count') {
+          text = `${filteredTickets.length} ticket${filteredTickets.length === 1 ? ' is' : 's are'} currently${assignmentContext}:`
+        } else {
+          text = `Here are ${filteredTickets.length} tickets${timeContext}${assignmentContext}:`
+        }
+        
         filteredTickets.forEach(ticket => {
           text += `\n- ${createTicketLink(ticket)} - Created ${formatRelativeDate(ticket.metadata.created_at)}`
         })

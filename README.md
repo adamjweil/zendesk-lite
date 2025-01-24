@@ -57,6 +57,14 @@ Comprehensive analytics with ticket distribution charts and trends.
 ![Tickets](./screenshots/tickets.png)
 Powerful ticket management interface with filtering and sorting capabilities.
 
+### AI Assistant
+![AI Assistant](./screenshots/ai_assistant.png)
+Smart AI-powered assistant for quick ticket inquiries and support automation.
+
+### Integrations
+![Integrations](./screenshots/integrations.png)
+Connect with popular third-party services to enhance your support workflow.
+
 ## Technical Stack
 
 - **Frontend**: React + Vite
