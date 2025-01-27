@@ -26,8 +26,31 @@ const generateEmbedding = async (text) => {
   return response.data[0].embedding
 }
 
+// Add timestamp tracking
+let lastUpdateTimestamp = null
+
 export const syncDataToPinecone = async () => {
   try {
+    // Check if there are any updates since last sync
+    const { data: latestChanges, error: changesError } = await supabase
+      .from('tickets')
+      .select('updated_at')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+
+    if (changesError) throw changesError
+
+    const latestChangeTime = latestChanges?.[0]?.updated_at
+    
+    // If no changes since last sync, skip
+    if (lastUpdateTimestamp && latestChangeTime && new Date(latestChangeTime) <= new Date(lastUpdateTimestamp)) {
+      console.log('No new changes since last sync, skipping...')
+      return { success: true, skipped: true }
+    }
+
+    // Proceed with sync if there are changes
+    console.log('Changes detected, syncing...')
+    
     // Fetch all tickets and their comments
     const { data: tickets, error: ticketsError } = await supabase
       .from('tickets')
@@ -120,6 +143,8 @@ export const syncDataToPinecone = async () => {
       }
     }
 
+    // Update the timestamp after successful sync
+    lastUpdateTimestamp = new Date().toISOString()
     return { success: true }
   } catch (error) {
     console.error('Error syncing data to Pinecone:', error)
@@ -140,15 +165,19 @@ const analyzeQuery = async (query) => {
         - For queries about counts or numbers, use 'count' type
         - For queries about changes over time, use 'trend' type
         - For queries about distribution across categories, use 'distribution' type
-        - For queries asking to list or show specific tickets, use 'list' type
+        - For queries about listing or showing specific tickets, use 'list' type
         - For queries about assignments or tickets assigned to someone, use 'list' type
         
         Pay special attention to:
         - Queries about assignments:
           * "assigned to me" or "my tickets" -> assignedTo: "me"
           * "assigned to [name]" -> assignedTo: "[name]" (e.g., "Bill" -> "bill")
-        - Time-based queries (e.g., "yesterday", "today", "this week")
-        - Status queries (e.g., "open tickets", "closed tickets")
+        - Time-based queries:
+          * "today", "completed today", "closed today" -> timeRange: "day", status: "closed"
+          * "yesterday" -> timeRange: "day" (for previous day)
+        - Status queries:
+          * "completed", "closed" -> status: "closed"
+          * "open tickets", "active tickets" -> status: "open"
         - Priority queries (e.g., "high priority", "urgent tickets")
         
         Return a JSON object with the following structure:
@@ -164,9 +193,9 @@ const analyzeQuery = async (query) => {
         }
         
         Example queries and responses:
+        "How many tickets were completed today?" -> { queryType: "count", filters: { status: "closed", timeRange: "day" } }
         "Show my tickets" -> { queryType: "list", filters: { assignedTo: "me" } }
-        "How many tickets are assigned to Bill?" -> { queryType: "list", filters: { assignedTo: "bill" } }
-        "Were any tickets from yesterday assigned to Adam?" -> { queryType: "list", filters: { assignedTo: "adam", timeRange: "day" } }`
+        "How many tickets are assigned to Bill?" -> { queryType: "list", filters: { assignedTo: "bill" } }`
       },
       {
         role: 'user',
@@ -256,11 +285,48 @@ const processQueryResults = async (results, analysis) => {
       // Debug logging
       console.log('Total tickets before filtering:', filteredResults.length)
       console.log('Analysis:', analysis)
+      console.log('Raw tickets:', filteredResults.map(t => ({
+        id: t.metadata.id,
+        status: t.metadata.status,
+        updated_at: t.metadata.updated_at,
+        created_at: t.metadata.created_at
+      })))
       
       // Apply time-based filters
       if (analysis.filters?.timeRange === 'day') {
-        filteredTickets = filteredTickets.filter(t => isYesterday(t.metadata.created_at))
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        
+        filteredTickets = filteredTickets.filter(t => {
+          const ticketDate = new Date(t.metadata.updated_at || t.metadata.created_at)
+          ticketDate.setHours(0, 0, 0, 0)
+          const isToday = ticketDate.getTime() === today.getTime()
+          console.log(`Ticket ${t.metadata.id} date check:`, {
+            ticketDate,
+            today,
+            isToday,
+            updated_at: t.metadata.updated_at,
+            created_at: t.metadata.created_at
+          })
+          return isToday
+        })
         console.log('Tickets after time filter:', filteredTickets.length)
+      }
+      
+      // Apply status filter
+      if (analysis.filters?.status) {
+        const targetStatus = analysis.filters.status.toLowerCase()
+        console.log('Filtering by status:', targetStatus)
+        filteredTickets = filteredTickets.filter(t => {
+          const ticketStatus = t.metadata.status.toLowerCase()
+          console.log(`Ticket ${t.metadata.id} status check:`, {
+            ticketStatus,
+            targetStatus,
+            matches: ticketStatus === targetStatus
+          })
+          return ticketStatus === targetStatus
+        })
+        console.log('Tickets after status filter:', filteredTickets.length)
       }
       
       // Apply assignment filter
@@ -284,11 +350,6 @@ const processQueryResults = async (results, analysis) => {
       if (analysis.filters?.priority) {
         filteredTickets = filteredTickets.filter(t => 
           t.metadata.priority.toLowerCase() === analysis.filters.priority.toLowerCase()
-        )
-      }
-      if (analysis.filters?.status) {
-        filteredTickets = filteredTickets.filter(t => 
-          t.metadata.status.toLowerCase() === analysis.filters.status.toLowerCase()
         )
       }
 
@@ -387,7 +448,7 @@ export const processMessage = async (message) => {
   }
 }
 
-// Set up real-time sync with Supabase
+// Update setupRealtimeSync to track changes
 export const setupRealtimeSync = () => {
   const channel = supabase
     .channel('schema-db-changes')
@@ -398,7 +459,11 @@ export const setupRealtimeSync = () => {
         schema: 'public',
         table: 'tickets'
       },
-      () => syncDataToPinecone()
+      async (payload) => {
+        console.log('Ticket change detected:', payload)
+        // Mark that we have changes
+        lastUpdateTimestamp = null
+      }
     )
     .on(
       'postgres_changes',
@@ -407,11 +472,32 @@ export const setupRealtimeSync = () => {
         schema: 'public',
         table: 'comments'
       },
-      () => syncDataToPinecone()
+      async (payload) => {
+        console.log('Comment change detected:', payload)
+        // Mark that we have changes
+        lastUpdateTimestamp = null
+      }
     )
     .subscribe()
 
   return () => {
     supabase.removeChannel(channel)
+  }
+}
+
+// Update forceSync to be smarter
+export const forceSync = async () => {
+  console.log('Checking if sync needed...')
+  try {
+    const result = await syncDataToPinecone()
+    if (result.skipped) {
+      console.log('Sync skipped - no new changes')
+    } else {
+      console.log('Sync completed')
+    }
+    return result
+  } catch (error) {
+    console.error('Error during sync:', error)
+    throw error
   }
 } 

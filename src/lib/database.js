@@ -218,7 +218,7 @@ export const getInvitationByToken = async (token) => {
       .from('invitations')
       .select(`
         *,
-        organization:organizations(name)
+        organization:organizations(id, name)
       `)
       .eq('token', token)
       .eq('status', 'pending')
@@ -226,6 +226,8 @@ export const getInvitationByToken = async (token) => {
       .single()
 
     if (error) throw error
+    if (!data) throw new Error('Invitation not found or expired')
+
     return { data, error: null }
   } catch (error) {
     console.error('Error fetching invitation:', error)
@@ -235,7 +237,13 @@ export const getInvitationByToken = async (token) => {
 
 export const deleteInvitation = async (invitationId) => {
   try {
-    // First get the user's organization_id to verify ownership
+    // First verify the current user is an admin
+    const isAdmin = await isCurrentUserAdmin()
+    if (!isAdmin) {
+      throw new Error('Only admins can delete invitations')
+    }
+
+    // Get the user's organization_id to verify ownership
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('organization_id')
@@ -706,5 +714,52 @@ export const getTeams = async () => {
   } catch (error) {
     console.error('Error fetching teams:', error);
     return { data: null, error };
+  }
+}
+
+// Delete user and optionally reassign their tickets
+export const deleteUser = async (userId, reassignTicketsTo = null) => {
+  try {
+    // First verify the current user is an admin
+    const isAdmin = await isCurrentUserAdmin()
+    if (!isAdmin) {
+      throw new Error('Only admins can delete users')
+    }
+
+    // Start a transaction to handle ticket reassignment and user deletion
+    const { error } = await supabase.rpc('delete_user_and_reassign_tickets', {
+      user_id_to_delete: userId,
+      reassign_to_user_id: reassignTicketsTo
+    })
+
+    if (error) throw error
+    return { error: null }
+  } catch (error) {
+    console.error('Error deleting user:', error)
+    return { error }
+  }
+}
+
+// Get tickets assigned to a specific user
+export const getTicketsAssignedToUser = async (userId) => {
+  try {
+    const { data, error } = await supabase
+      .from('tickets')
+      .select(`
+        id,
+        subject,
+        status,
+        priority,
+        assignee_type,
+        assigned_to
+      `)
+      .eq('assignee_type', 'user')
+      .eq('assigned_to', userId)
+
+    if (error) throw error
+    return { data, error: null }
+  } catch (error) {
+    console.error('Error fetching user tickets:', error)
+    return { data: null, error }
   }
 } 

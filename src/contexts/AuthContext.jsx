@@ -120,27 +120,39 @@ function AuthProvider({ children }) {
 }
 
 const fetchProfile = async (userId) => {
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select(`
-      *,
-      organization:organizations(
-        id,
-        name,
-        website,
-        description
-      )
-    `)
-    .eq('id', userId)
-    .single()
+  try {
+    console.log('Fetching profile...')
+    
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select(`
+        *,
+        organization:organizations(
+          id,
+          name,
+          website,
+          description
+        )
+      `)
+      .eq('id', userId)
+      .maybeSingle()
 
-  if (error) {
-    console.error('Error fetching profile:', error)
+    if (error) {
+      console.error('Error fetching profile:', error)
+      return null
+    }
+
+    if (profile) {
+      console.log('Profile loaded with org:', profile)
+      return profile
+    }
+
+    console.log('No profile found')
+    return null
+  } catch (error) {
+    console.error('Unexpected error in fetchProfile:', error)
     return null
   }
-
-  console.log('Profile loaded with org:', profile)
-  return profile
 }
 
 // Export both the provider and the hook

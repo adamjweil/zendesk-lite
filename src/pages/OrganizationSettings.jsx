@@ -1,10 +1,110 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { getUserProfile, updateOrganization, getTags, createTag, updateTag, deleteTag, generateSupportEmail, deleteSupportEmail } from '../lib/database'
-import { Building, Mail, Copy, X, Trash2 } from 'lucide-react'
+import { getUserProfile, updateOrganization, getTags, createTag, updateTag, deleteTag, generateSupportEmail, deleteSupportEmail, deleteUser, getTicketsAssignedToUser } from '../lib/database'
+import { Building, Mail, Copy, X, Trash2, AlertTriangle } from 'lucide-react'
 import Users from './Users'
 import Teams from './Teams'
+
+function DeleteUserModal({ user, onClose, onConfirm, availableUsers }) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [reassignTo, setReassignTo] = useState('')
+  const [userTickets, setUserTickets] = useState([])
+  const [loadingTickets, setLoadingTickets] = useState(true)
+
+  useEffect(() => {
+    const loadUserTickets = async () => {
+      const { data, error } = await getTicketsAssignedToUser(user.id)
+      if (error) {
+        setError('Failed to load user tickets')
+      } else {
+        setUserTickets(data || [])
+      }
+      setLoadingTickets(false)
+    }
+    loadUserTickets()
+  }, [user.id])
+
+  const handleConfirm = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      await onConfirm(user.id, reassignTo || null)
+      onClose()
+    } catch (err) {
+      setError('Failed to delete user')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-base-100 rounded-lg p-6 max-w-md w-full mx-4">
+        <div className="flex items-start gap-4">
+          <div className="p-2 bg-warning/10 rounded-full">
+            <AlertTriangle className="h-6 w-6 text-warning" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold mb-2">Delete User</h3>
+            <p className="text-sm text-base-content/70 mb-4">
+              Are you sure you want to delete {user.full_name}? This action cannot be undone.
+            </p>
+
+            {loadingTickets ? (
+              <div className="flex justify-center py-4">
+                <span className="loading loading-spinner"></span>
+              </div>
+            ) : userTickets.length > 0 ? (
+              <div className="mb-4">
+                <p className="text-sm font-medium mb-2">
+                  This user has {userTickets.length} assigned ticket{userTickets.length !== 1 ? 's' : ''}. 
+                  Please select a user to reassign them to:
+                </p>
+                <select
+                  className="select select-bordered w-full"
+                  value={reassignTo}
+                  onChange={(e) => setReassignTo(e.target.value)}
+                >
+                  <option value="">Leave tickets unassigned</option>
+                  {availableUsers
+                    .filter(u => u.id !== user.id)
+                    .map(u => (
+                      <option key={u.id} value={u.id}>{u.full_name}</option>
+                    ))}
+                </select>
+              </div>
+            ) : null}
+
+            {error && (
+              <div className="alert alert-error mb-4">
+                <span className="text-sm">{error}</span>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={onClose}
+                className="btn btn-ghost btn-sm"
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirm}
+                className="btn btn-error btn-sm"
+                disabled={loading}
+              >
+                {loading ? <span className="loading loading-spinner"></span> : 'Delete User'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function OrganizationSettings() {
   const { user } = useAuth()

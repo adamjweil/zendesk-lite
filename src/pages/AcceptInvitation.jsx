@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getInvitationByToken } from '../lib/database'
 import { signUp } from '../lib/supabase'
 
 export default function AcceptInvitation() {
-  const { token } = useParams()
+  const [searchParams] = useSearchParams()
+  const token = searchParams.get('token')
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -17,6 +18,11 @@ export default function AcceptInvitation() {
   })
 
   useEffect(() => {
+    if (!token) {
+      setError('Invalid invitation link')
+      setLoading(false)
+      return
+    }
     loadInvitation()
   }, [token])
 
@@ -48,15 +54,26 @@ export default function AcceptInvitation() {
     setError(null)
 
     try {
-      const { error } = await signUp({
+      console.log('Invitation data:', invitation)
+      console.log('Form data:', form)
+      
+      const signupData = {
         email: invitation.email,
         password: form.password,
         fullName: form.fullName,
         role: invitation.role,
-      })
+        organizationId: invitation.organization_id,
+      }
+      console.log('Attempting signup with:', signupData)
+      
+      const { error } = await signUp(signupData)
 
-      if (error) throw error
+      if (error) {
+        console.error('Signup error:', error)
+        throw error
+      }
 
+      console.log('Signup successful, redirecting to login')
       // Redirect to login with success message
       navigate('/login', {
         state: {

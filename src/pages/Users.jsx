@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { getOrganizationUsers, getInvitations, createInvitation, deleteInvitation, updateUserRole, isCurrentUserAdmin } from '../lib/database'
-import { UserPlus, Mail, Clock, Trash2, UserCog } from 'lucide-react'
+import { getOrganizationUsers, getInvitations, createInvitation, deleteInvitation, updateUserRole, isCurrentUserAdmin, deleteUser, getTicketsAssignedToUser } from '../lib/database'
+import { UserPlus, Mail, Clock, Trash2, UserCog, AlertTriangle } from 'lucide-react'
 
 // Role badge color mapping
 const getRoleBadgeColors = (role) => {
@@ -17,8 +17,109 @@ const getRoleBadgeColors = (role) => {
   }
 }
 
+// Add DeleteUserModal component
+function DeleteUserModal({ user, onClose, onConfirm, availableUsers }) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [reassignTo, setReassignTo] = useState('')
+  const [userTickets, setUserTickets] = useState([])
+  const [loadingTickets, setLoadingTickets] = useState(true)
+
+  useEffect(() => {
+    const loadUserTickets = async () => {
+      const { data, error } = await getTicketsAssignedToUser(user.id)
+      if (error) {
+        setError('Failed to load user tickets')
+      } else {
+        setUserTickets(data || [])
+      }
+      setLoadingTickets(false)
+    }
+    loadUserTickets()
+  }, [user.id])
+
+  const handleConfirm = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      await onConfirm(user.id, reassignTo || null)
+      onClose()
+    } catch (err) {
+      setError('Failed to delete user')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-base-100 rounded-lg p-6 max-w-md w-full mx-4">
+        <div className="flex items-start gap-4">
+          <div className="p-2 bg-warning/10 rounded-full">
+            <AlertTriangle className="h-6 w-6 text-warning" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold mb-2">Delete User</h3>
+            <p className="text-sm text-base-content/70 mb-4">
+              Are you sure you want to delete {user.full_name}? This action cannot be undone.
+            </p>
+
+            {loadingTickets ? (
+              <div className="flex justify-center py-4">
+                <span className="loading loading-spinner"></span>
+              </div>
+            ) : userTickets.length > 0 ? (
+              <div className="mb-4">
+                <p className="text-sm font-medium mb-2">
+                  This user has {userTickets.length} assigned ticket{userTickets.length !== 1 ? 's' : ''}. 
+                  Please select a user to reassign them to:
+                </p>
+                <select
+                  className="select select-bordered w-full"
+                  value={reassignTo}
+                  onChange={(e) => setReassignTo(e.target.value)}
+                >
+                  <option value="">Leave tickets unassigned</option>
+                  {availableUsers
+                    .filter(u => u.id !== user.id)
+                    .map(u => (
+                      <option key={u.id} value={u.id}>{u.full_name}</option>
+                    ))}
+                </select>
+              </div>
+            ) : null}
+
+            {error && (
+              <div className="alert alert-error mb-4">
+                <span className="text-sm">{error}</span>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={onClose}
+                className="btn btn-ghost btn-sm"
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirm}
+                className="btn btn-error btn-sm"
+                disabled={loading}
+              >
+                {loading ? <span className="loading loading-spinner"></span> : 'Delete User'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Users() {
-  const { user } = useAuth()
+  const { user: currentUser } = useAuth()
   const [users, setUsers] = useState([])
   const [invitations, setInvitations] = useState([])
   const [loading, setLoading] = useState(true)
@@ -33,6 +134,7 @@ export default function Users() {
     email: '',
     role: 'agent',
   })
+  const [userToDelete, setUserToDelete] = useState(null)
 
   useEffect(() => {
     loadData()
@@ -74,7 +176,7 @@ export default function Users() {
       const { error } = await createInvitation({
         email: inviteForm.email,
         role: inviteForm.role,
-        organizationId: user?.organization?.id,
+        organizationId: currentUser?.organization?.id,
       })
 
       if (error) throw error
@@ -145,6 +247,35 @@ export default function Users() {
     }
   }
 
+  const handleRoleChange = async (userId, newRole) => {
+    try {
+      const { error } = await updateUserRole(userId, newRole)
+      if (error) throw error
+      
+      // Update local state
+      setUsers(users.map(u => 
+        u.id === userId ? { ...u, role: newRole } : u
+      ))
+    } catch (error) {
+      console.error('Error updating user role:', error)
+      setError('Failed to update user role')
+    }
+  }
+
+  const handleDeleteUser = async (userId, reassignTo) => {
+    try {
+      const { error } = await deleteUser(userId, reassignTo)
+      if (error) throw error
+      
+      // Update local state
+      setUsers(users.filter(u => u.id !== userId))
+      setUserToDelete(null)
+    } catch (error) {
+      console.error('Error deleting user:', error)
+      setError('Failed to delete user')
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -195,8 +326,17 @@ export default function Users() {
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${getRoleBadgeColors(user.role)}`}>
                         {user.role}
                       </span>
-                      {isAdmin && (
-                        <UserCog className="h-3 w-3 text-gray-400" />
+                      {isAdmin && user.id !== currentUser?.id && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setUserToDelete(user);
+                          }}
+                          className="text-error hover:text-error/70 p-1 rounded-full hover:bg-error/10"
+                          title="Delete user"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
                       )}
                     </div>
                   </div>
@@ -355,6 +495,15 @@ export default function Users() {
             }}
           ></div>
         </div>
+      )}
+
+      {userToDelete && (
+        <DeleteUserModal
+          user={userToDelete}
+          onClose={() => setUserToDelete(null)}
+          onConfirm={handleDeleteUser}
+          availableUsers={users}
+        />
       )}
     </div>
   )
