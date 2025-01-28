@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, Filter, Search, Calendar, User, X, MessageSquare, Clock, AlertCircle, ChevronUp, ChevronDown, Users } from 'lucide-react'
-import { getTickets, createTicket, getTicketComments, updateTicket, createComment, getTags, getTagsForTicket, addTagToTicket, removeTagFromTicket, getOrganizationUsers, getTeams, assignTicket } from '../lib/database'
+import { Plus, Filter, Search, Calendar, User, X, MessageSquare, Clock, AlertCircle, ChevronUp, ChevronDown, Users, Upload, Download } from 'lucide-react'
+import { getTickets, createTicket, getTicketComments, updateTicket, createComment, getTags, getTagsForTicket, addTagToTicket, removeTagFromTicket, getOrganizationUsers, getTeams, assignTicket, uploadFile, getTicketFiles, getFileUrl, deleteFile } from '../lib/database'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function Tickets() {
@@ -21,7 +21,9 @@ export default function Tickets() {
     subject: '',
     description: '',
     priority: 'medium',
-    category: '',
+    assignee_type: '',
+    assigned_to: '',
+    tags: []
   })
   const [availableTags, setAvailableTags] = useState([])
   const [selectedTags, setSelectedTags] = useState([])
@@ -33,6 +35,14 @@ export default function Tickets() {
     direction: 'desc'
   })
   const [availableTeams, setAvailableTeams] = useState([])
+  const [files, setFiles] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const [ticketFiles, setTicketFiles] = useState([])
+  const [modalFiles, setModalFiles] = useState([])
+  const [modalUploading, setModalUploading] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState(null)
+  const [fileUrls, setFileUrls] = useState({})
+  const [fullSizeFile, setFullSizeFile] = useState(null)
 
   useEffect(() => {
     loadTickets()
@@ -45,6 +55,7 @@ export default function Tickets() {
     if (selectedTicket) {
       loadTicketComments()
       loadSelectedTags(selectedTicket.id)
+      loadTicketFiles()
     }
   }, [selectedTicket])
 
@@ -73,6 +84,7 @@ export default function Tickets() {
     if (error) {
       console.error('Error loading tickets:', error)
     } else {
+      console.log('Tickets loaded:', data)
       setTickets(data || [])
     }
     setLoading(false)
@@ -122,6 +134,52 @@ export default function Tickets() {
       return
     }
     setAvailableTeams(data)
+  }
+
+  const loadFileUrl = async (file) => {
+    if (!fileUrls[file.id]) {
+      const { data } = await getFileUrl(file.file_path)
+      if (data) {
+        setFileUrls(prev => ({
+          ...prev,
+          [file.id]: data.signedUrl
+        }))
+      }
+    }
+    return fileUrls[file.id]
+  }
+
+  const loadTicketFiles = async () => {
+    if (!selectedTicket) return
+    const { data, error } = await getTicketFiles(selectedTicket.id)
+    if (error) {
+      console.error('Error loading ticket files:', error)
+    } else {
+      setTicketFiles(data || [])
+      // Load signed URLs for all image files
+      const imageFiles = (data || []).filter(file => isImageFile(file.filename))
+      for (const file of imageFiles) {
+        loadFileUrl(file)
+      }
+    }
+  }
+
+  const handleFileDownload = async (file) => {
+    const { data, error } = await getFileUrl(file.file_path)
+    if (error) {
+      console.error('Error getting file URL:', error)
+    } else {
+      window.open(data.signedUrl, '_blank')
+    }
+  }
+
+  const handleFileDelete = async (fileId) => {
+    const { error } = await deleteFile(fileId)
+    if (error) {
+      console.error('Error deleting file:', error)
+    } else {
+      loadTicketFiles()
+    }
   }
 
   const handleTicketClick = (ticket) => {
@@ -186,24 +244,67 @@ export default function Tickets() {
 
   const handleCreateTicket = async (e) => {
     e.preventDefault()
-    const ticketData = {
-      ...newTicket,
-      creator_id: profile.id,
-    }
-    
-    const { error } = await createTicket(ticketData)
-    if (error) {
-      console.error('Error creating ticket:', error)
-    } else {
+    setUploading(true)
+    try {
+      // First create the ticket
+      const { tags, ...ticketData } = {
+        ...newTicket,
+        creator_id: profile.id,
+        organization_id: profile.organization_id,
+      }
+      
+      const { data: ticket, error } = await createTicket(ticketData)
+      if (error) {
+        console.error('Error creating ticket:', error)
+        return
+      }
+
+      console.log('Created ticket:', ticket)
+
+      // Upload files if any
+      if (files.length > 0) {
+        console.log('Uploading files:', files)
+        for (const file of files) {
+          const { error: uploadError } = await uploadFile(file, ticket.id)
+          if (uploadError) {
+            console.error('Error uploading file:', uploadError)
+          }
+        }
+      }
+
+      // Add tags to the ticket
+      if (tags.length > 0) {
+        for (const tagId of tags) {
+          await addTagToTicket(ticket.id, tagId)
+        }
+      }
+      
       setShowNewTicketModal(false)
       setNewTicket({
         subject: '',
         description: '',
         priority: 'medium',
-        category: '',
+        assignee_type: '',
+        assigned_to: '',
+        tags: []
       })
-      loadTickets()
+      setFiles([])
+      // Ensure we reload tickets to get updated file attachment information
+      await loadTickets()
+    } catch (error) {
+      console.error('Error in ticket creation:', error)
+    } finally {
+      setUploading(false)
     }
+  }
+
+  const handleFileChange = (e) => {
+    const newFiles = Array.from(e.target.files)
+    setFiles(prev => [...prev, ...newFiles])
+  }
+
+  const removeFile = (index) => {
+    setFiles(prev => prev.filter((_, i) => i !== index))
   }
 
   const handleAddTagToTicket = async (tagId) => {
@@ -284,6 +385,43 @@ export default function Tickets() {
     pending: 'bg-yellow-100 text-yellow-800',
     resolved: 'bg-gray-100 text-gray-800',
     closed: 'bg-gray-100 text-gray-800',
+  }
+
+  const handleModalFileUpload = async (e) => {
+    e.preventDefault()
+    setModalUploading(true)
+    try {
+      const files = Array.from(e.target.files)
+      for (const file of files) {
+        const { error: uploadError } = await uploadFile(file, selectedTicket.id)
+        if (uploadError) {
+          console.error('Error uploading file:', uploadError)
+        }
+      }
+      // Refresh the files list
+      loadTicketFiles()
+    } catch (error) {
+      console.error('Error uploading files:', error)
+    } finally {
+      setModalUploading(false)
+    }
+  }
+
+  const isImageFile = (filename) => {
+    const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp']
+    const extension = filename.split('.').pop().toLowerCase()
+    return imageExtensions.includes(extension)
+  }
+
+  const handlePreviewClick = async (file) => {
+    const { data } = await getFileUrl(file.file_path)
+    if (data) {
+      setPreviewUrl(data.signedUrl)
+    }
+  }
+
+  const handleExpandImage = (file) => {
+    setFullSizeFile(file)
   }
 
   return (
@@ -439,11 +577,23 @@ export default function Tickets() {
                             </span>
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap">
-                            <div className="text-xs font-medium text-primary">
-                              {ticket.subject}
-                            </div>
-                            <div className="text-xs text-gray-500 truncate max-w-md">
-                              {ticket.description}
+                            <div className="flex items-center">
+                              <div className="flex-1">
+                                <div className="text-xs font-medium text-primary">
+                                  {ticket.subject}
+                                  {ticket.has_attachments && (
+                                    <span className="ml-2 inline-flex items-center group">
+                                      <Upload 
+                                        className="h-3.5 w-3.5 text-gray-400 group-hover:text-primary transition-colors duration-150" 
+                                        title="Has attachments"
+                                      />
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-xs text-gray-500 truncate mt-0.5">
+                                  {ticket.description}
+                                </div>
+                              </div>
                             </div>
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap">
@@ -568,6 +718,185 @@ export default function Tickets() {
                   </div>
                 </div>
 
+                {/* File Attachments Section */}
+                <div className="mt-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-lg font-medium text-gray-900">Attachments</h3>
+                    <div className="flex items-center space-x-2">
+                      {fullSizeFile && (
+                        <button
+                          onClick={() => setFullSizeFile(null)}
+                          className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Exit Full View
+                        </button>
+                      )}
+                      <div className="relative">
+                        <input
+                          type="file"
+                          multiple
+                          onChange={handleModalFileUpload}
+                          className="hidden"
+                          id="modal-file-upload"
+                          disabled={modalUploading}
+                        />
+                        <label
+                          htmlFor="modal-file-upload"
+                          className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary cursor-pointer"
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          {modalUploading ? 'Uploading...' : 'Add Files'}
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                  {fullSizeFile && isImageFile(fullSizeFile.filename) ? (
+                    <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ height: 'calc(100vh - 400px)' }}>
+                      {fileUrls[fullSizeFile.id] ? (
+                        <img
+                          src={fileUrls[fullSizeFile.id]}
+                          alt={fullSizeFile.filename}
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center w-full h-full">
+                          <Upload className="h-8 w-8 text-gray-400" />
+                        </div>
+                      )}
+                      <div className="absolute bottom-4 right-4 flex space-x-2">
+                        <button
+                          onClick={() => handleFileDownload(fullSizeFile)}
+                          className="p-2 text-white bg-gray-800 bg-opacity-50 rounded-full hover:bg-opacity-75"
+                          title="Download"
+                        >
+                          <Download className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={() => handleFileDelete(fullSizeFile.id)}
+                          className="p-2 text-white bg-gray-800 bg-opacity-50 rounded-full hover:bg-opacity-75"
+                          title="Delete"
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-4">
+                      {ticketFiles.map((file) => (
+                        <div key={file.id} className="relative group">
+                          {isImageFile(file.filename) ? (
+                            <div className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                              <button
+                                onClick={() => handlePreviewClick(file)}
+                                className="w-full h-full flex items-center justify-center"
+                              >
+                                {fileUrls[file.id] ? (
+                                  <img
+                                    src={fileUrls[file.id]}
+                                    alt={file.filename}
+                                    className="object-cover w-full h-full"
+                                  />
+                                ) : (
+                                  <div className="flex items-center justify-center w-full h-full">
+                                    <Upload className="h-8 w-8 text-gray-400" />
+                                  </div>
+                                )}
+                              </button>
+                              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-opacity flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                <div className="flex space-x-2">
+                                  <button
+                                    onClick={() => handleExpandImage(file)}
+                                    className="p-2 text-white hover:text-blue-200"
+                                    title="Expand"
+                                  >
+                                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    onClick={() => handleFileDownload(file)}
+                                    className="p-2 text-white hover:text-blue-200"
+                                    title="Download"
+                                  >
+                                    <Download className="h-5 w-5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleFileDelete(file.id)}
+                                    className="p-2 text-white hover:text-red-200"
+                                    title="Delete"
+                                  >
+                                    <X className="h-5 w-5" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="aspect-square bg-gray-50 rounded-lg p-4 flex flex-col items-center justify-center border border-gray-200">
+                              <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                              <span className="text-sm text-gray-900 truncate w-full text-center">
+                                {file.filename}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                ({(file.size_bytes / 1024).toFixed(1)} KB)
+                              </span>
+                              <div className="mt-2 flex space-x-2">
+                                <button
+                                  onClick={() => handleFileDownload(file)}
+                                  className="text-gray-600 hover:text-gray-900"
+                                  title="Download"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleFileDelete(file.id)}
+                                  className="text-red-600 hover:text-red-900"
+                                  title="Delete"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {ticketFiles.length === 0 && (
+                        <div className="col-span-full text-sm text-gray-500 text-center py-4">
+                          No attachments yet
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Image Preview Modal */}
+                {previewUrl && (
+                  <div 
+                    className="fixed z-50 inset-0 overflow-y-auto" 
+                    onClick={() => setPreviewUrl(null)}
+                  >
+                    <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center">
+                      <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
+                      <div className="relative inline-block bg-white rounded-lg overflow-hidden shadow-xl max-w-3xl max-h-[90vh]">
+                        <img 
+                          src={previewUrl} 
+                          alt="Preview" 
+                          className="max-w-full max-h-[90vh] object-contain"
+                        />
+                        <button
+                          className="absolute top-4 right-4 text-white bg-gray-800 bg-opacity-50 rounded-full p-2 hover:bg-opacity-75"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setPreviewUrl(null)
+                          }}
+                        >
+                          <X className="h-6 w-6" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Comments Section */}
                 <div className="border-t border-gray-200 pt-6">
                   <h4 className="text-lg font-medium text-gray-900 mb-4">Comments & Notes</h4>
@@ -680,40 +1009,64 @@ export default function Tickets() {
         <div className="fixed z-10 inset-0 overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
-            <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
-              <form onSubmit={handleCreateTicket}>
-                <div>
-                  <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Create New Ticket</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label htmlFor="subject" className="block text-sm font-medium text-gray-700">
-                        Subject
-                      </label>
-                      <input
-                        type="text"
-                        id="subject"
-                        required
-                        value={newTicket.subject}
-                        onChange={(e) => setNewTicket({ ...newTicket, subject: e.target.value })}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-                        Description
-                      </label>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+              <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">Create New Ticket</h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowNewTicketModal(false)}
+                    className="rounded-md text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <span className="sr-only">Close</span>
+                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              
+              <form onSubmit={handleCreateTicket} className="bg-white">
+                <div className="px-4 py-5 sm:p-6 space-y-6">
+                  {/* Subject */}
+                  <div>
+                    <label htmlFor="subject" className="block text-sm font-medium text-gray-700">
+                      Subject <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      id="subject"
+                      required
+                      value={newTicket.subject}
+                      onChange={(e) => setNewTicket({ ...newTicket, subject: e.target.value })}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                      placeholder="Enter ticket subject"
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+                      Description <span className="text-red-500">*</span>
+                    </label>
+                    <div className="mt-1">
                       <textarea
                         id="description"
                         required
                         rows={4}
                         value={newTicket.description}
                         onChange={(e) => setNewTicket({ ...newTicket, description: e.target.value })}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                        className="shadow-sm focus:ring-primary focus:border-primary block w-full sm:text-sm border border-gray-300 rounded-md"
+                        placeholder="Provide detailed information about the ticket..."
                       />
                     </div>
+                  </div>
+
+                  {/* Priority and Assignment Row */}
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                     <div>
                       <label htmlFor="priority" className="block text-sm font-medium text-gray-700">
-                        Priority
+                        Priority <span className="text-red-500">*</span>
                       </label>
                       <select
                         id="priority"
@@ -721,37 +1074,149 @@ export default function Tickets() {
                         onChange={(e) => setNewTicket({ ...newTicket, priority: e.target.value })}
                         className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md"
                       >
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                        <option value="urgent">Urgent</option>
+                        <option value="low">🟢 Low</option>
+                        <option value="medium">🟡 Medium</option>
+                        <option value="high">🟠 High</option>
+                        <option value="urgent">🔴 Urgent</option>
                       </select>
                     </div>
                     <div>
-                      <label htmlFor="category" className="block text-sm font-medium text-gray-700">
-                        Category
+                      <label htmlFor="assignment" className="block text-sm font-medium text-gray-700">
+                        Assign To
                       </label>
-                      <input
-                        type="text"
-                        id="category"
-                        value={newTicket.category}
-                        onChange={(e) => setNewTicket({ ...newTicket, category: e.target.value })}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                      />
+                      <select
+                        id="assignment"
+                        value={`${newTicket.assignee_type}:${newTicket.assigned_to}`}
+                        onChange={(e) => {
+                          const [assigneeType, assignedTo] = e.target.value.split(':')
+                          setNewTicket({
+                            ...newTicket,
+                            assignee_type: assigneeType || '',
+                            assigned_to: assignedTo || ''
+                          })
+                        }}
+                        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md"
+                      >
+                        <option value="">-- Select Assignee --</option>
+                        <optgroup label="Users">
+                          {organizationUsers
+                            .filter(user => ['admin', 'agent'].includes(user.role))
+                            .map((user) => (
+                              <option key={user.id} value={`user:${user.id}`}>
+                                👤 {user.full_name}
+                              </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Teams">
+                          {availableTeams.map((team) => (
+                            <option key={team.id} value={`team:${team.id}`}>
+                              👥 {team.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Tags */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Tags
+                    </label>
+                    <div className="border border-gray-300 rounded-md p-4 bg-gray-50">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {availableTags.map((tag) => (
+                          <label key={tag.id} className="inline-flex items-center bg-white px-3 py-2 rounded-md shadow-sm hover:bg-gray-50 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={newTicket.tags.includes(tag.id)}
+                              onChange={(e) => {
+                                const updatedTags = e.target.checked
+                                  ? [...newTicket.tags, tag.id]
+                                  : newTicket.tags.filter(id => id !== tag.id)
+                                setNewTicket({ ...newTicket, tags: updatedTags })
+                              }}
+                              className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">{tag.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* File Upload */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Attachments
+                    </label>
+                    <div className="space-y-4">
+                      {/* File List */}
+                      {files.length > 0 && (
+                        <div className="space-y-2">
+                          {files.map((file, index) => (
+                            <div key={index} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-md">
+                              <div className="flex items-center">
+                                <Upload className="h-4 w-4 text-gray-400 mr-2" />
+                                <span className="text-sm text-gray-600">{file.name}</span>
+                                <span className="text-xs text-gray-400 ml-2">
+                                  ({(file.size / 1024).toFixed(1)} KB)
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeFile(index)}
+                                className="text-red-500 hover:text-red-700"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Upload Button */}
+                      <div className="flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                        <div className="space-y-1 text-center">
+                          <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                          <div className="flex text-sm text-gray-600">
+                            <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary-dark focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary">
+                              <span>Upload files</span>
+                              <input
+                                id="file-upload"
+                                name="file-upload"
+                                type="file"
+                                multiple
+                                className="sr-only"
+                                onChange={handleFileChange}
+                              />
+                            </label>
+                            <p className="pl-1">or drag and drop</p>
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            Any file up to 10MB
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+
+                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-gray-200">
                   <button
                     type="submit"
-                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary text-base font-medium text-white hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary sm:col-start-2 sm:text-sm"
+                    disabled={uploading}
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary text-base font-medium text-white hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Create
+                    {uploading ? 'Creating...' : 'Create Ticket'}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShowNewTicketModal(false)}
-                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary sm:mt-0 sm:col-start-1 sm:text-sm"
+                    onClick={() => {
+                      setShowNewTicketModal(false)
+                      setFiles([])
+                    }}
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                   >
                     Cancel
                   </button>
