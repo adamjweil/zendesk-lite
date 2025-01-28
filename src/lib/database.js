@@ -275,7 +275,8 @@ export const getTickets = async (filters = {}) => {
       .from('tickets')
       .select(`
         *,
-        creator:profiles!tickets_creator_id_fkey(*)
+        creator:profiles!tickets_creator_id_fkey(*),
+        file_attachments(id)
       `)
       .order('created_at', { ascending: false });
 
@@ -309,7 +310,8 @@ export const getTickets = async (filters = {}) => {
       ...ticket,
       creator: profiles?.find(p => p.id === ticket.creator_id),
       assigned_user: ticket.assignee_type === 'user' ? { id: ticket.assigned_to, full_name: profileMap[ticket.assigned_to] } : null,
-      assigned_team: ticket.assignee_type === 'team' ? { id: ticket.assigned_to, name: teamMap[ticket.assigned_to] } : null
+      assigned_team: ticket.assignee_type === 'team' ? { id: ticket.assigned_to, name: teamMap[ticket.assigned_to] } : null,
+      has_attachments: ticket.file_attachments && ticket.file_attachments.length > 0
     }));
 
     return { data: enhancedTickets, error: null };
@@ -321,9 +323,12 @@ export const getTickets = async (filters = {}) => {
 
 export const createTicket = async (ticketData) => {
   try {
+    // Generate a UUID using the browser's crypto API
+    const ticketId = crypto.randomUUID()
+    
     const { data, error } = await supabase
       .from('tickets')
-      .insert([ticketData])
+      .insert([{ id: ticketId, ...ticketData }])
       .select(`
         *,
         creator:profiles!creator_id(*),
@@ -760,6 +765,124 @@ export const getTicketsAssignedToUser = async (userId) => {
     return { data, error: null }
   } catch (error) {
     console.error('Error fetching user tickets:', error)
+    return { data: null, error }
+  }
+}
+
+// File attachment operations
+export const uploadFile = async (file, ticketId) => {
+  try {
+    console.log('Starting file upload for ticket:', ticketId)
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+    const filePath = `${ticketId}/${fileName}`
+
+    console.log('Uploading to storage:', filePath)
+    // Upload to Supabase Storage
+    const { data: storageData, error: uploadError } = await supabase.storage
+      .from('ticket-attachments')  // Make sure this matches your bucket name exactly
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      })
+
+    if (uploadError) {
+      console.error('Storage upload error:', uploadError)
+      throw uploadError
+    }
+
+    console.log('Storage upload successful:', storageData)
+    console.log('Creating file attachment record')
+    
+    // Create file attachment record
+    const { data, error: dbError } = await supabase
+      .from('file_attachments')
+      .insert([{
+        ticket_id: ticketId,
+        filename: file.name,
+        file_path: filePath,
+        content_type: file.type,
+        size_bytes: file.size,
+        uploaded_by: (await supabase.auth.getUser()).data.user?.id
+      }])
+      .select()
+      .single()
+
+    if (dbError) {
+      console.error('Database record creation error:', dbError)
+      throw dbError
+    }
+
+    console.log('File upload completed successfully:', data)
+    return { data, error: null }
+  } catch (error) {
+    console.error('Error in uploadFile:', error)
+    return { data: null, error }
+  }
+}
+
+export const getTicketFiles = async (ticketId) => {
+  try {
+    const { data, error } = await supabase
+      .from('file_attachments')
+      .select(`
+        *,
+        uploader:profiles!uploaded_by(full_name)
+      `)
+      .eq('ticket_id', ticketId)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return { data, error: null }
+  } catch (error) {
+    console.error('Error fetching ticket files:', error)
+    return { data: null, error }
+  }
+}
+
+export const deleteFile = async (fileId) => {
+  try {
+    // First get the file path
+    const { data: file, error: fetchError } = await supabase
+      .from('file_attachments')
+      .select('file_path')
+      .eq('id', fileId)
+      .single()
+
+    if (fetchError) throw fetchError
+
+    // Delete from storage
+    const { error: storageError } = await supabase.storage
+      .from('ticket-attachments')
+      .remove([file.file_path])
+
+    if (storageError) throw storageError
+
+    // Delete the record
+    const { error: deleteError } = await supabase
+      .from('file_attachments')
+      .delete()
+      .eq('id', fileId)
+
+    if (deleteError) throw deleteError
+
+    return { error: null }
+  } catch (error) {
+    console.error('Error deleting file:', error)
+    return { error }
+  }
+}
+
+export const getFileUrl = async (filePath) => {
+  try {
+    const { data, error } = await supabase.storage
+      .from('ticket-attachments')
+      .createSignedUrl(filePath, 3600) // URL valid for 1 hour
+
+    if (error) throw error
+    return { data, error: null }
+  } catch (error) {
+    console.error('Error getting file URL:', error)
     return { data: null, error }
   }
 } 

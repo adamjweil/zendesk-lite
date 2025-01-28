@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { getTickets, updateTicket, getTicketComments, createComment, getOrganizationUsers, getTeams } from '../lib/database'
-import { MessageSquare, Clock, AlertCircle, ArrowLeft, User, Users } from 'lucide-react'
+import { getTickets, updateTicket, getTicketComments, createComment, getOrganizationUsers, getTeams, uploadFile, getTicketFiles, deleteFile, getFileUrl } from '../lib/database'
+import { MessageSquare, Clock, AlertCircle, ArrowLeft, User, Users, Upload, X, Download } from 'lucide-react'
 
 // Create a custom event for ticket updates
 const TICKET_UPDATED_EVENT = 'ticketUpdated'
@@ -19,11 +19,14 @@ export default function TicketDetails() {
   const [isInternalNote, setIsInternalNote] = useState(false)
   const [organizationUsers, setOrganizationUsers] = useState([])
   const [availableTeams, setAvailableTeams] = useState([])
+  const [files, setFiles] = useState([])
+  const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
     loadTicketDetails()
     loadOrganizationUsers()
     loadTeams()
+    loadTicketFiles()
   }, [ticketId])
 
   const loadTeams = async () => {
@@ -65,6 +68,15 @@ export default function TicketDetails() {
     }
 
     setLoading(false)
+  }
+
+  const loadTicketFiles = async () => {
+    const { data, error } = await getTicketFiles(ticketId)
+    if (error) {
+      console.error('Error loading ticket files:', error)
+    } else {
+      setFiles(data || [])
+    }
   }
 
   const handleStatusChange = async (newStatus) => {
@@ -131,6 +143,40 @@ export default function TicketDetails() {
       setNewComment('')
       setIsInternalNote(false)
       loadTicketDetails()
+    }
+  }
+
+  const handleFileUpload = async (e) => {
+    const newFiles = Array.from(e.target.files)
+    setUploading(true)
+    
+    try {
+      for (const file of newFiles) {
+        await uploadFile(file, ticketId)
+      }
+      loadTicketFiles()
+    } catch (error) {
+      console.error('Error uploading files:', error)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleFileDelete = async (fileId) => {
+    const { error } = await deleteFile(fileId)
+    if (error) {
+      console.error('Error deleting file:', error)
+    } else {
+      loadTicketFiles()
+    }
+  }
+
+  const handleFileDownload = async (file) => {
+    const { data, error } = await getFileUrl(file.file_path)
+    if (error) {
+      console.error('Error getting file URL:', error)
+    } else {
+      window.open(data.signedUrl, '_blank')
     }
   }
 
@@ -222,6 +268,78 @@ export default function TicketDetails() {
         <div className="mt-4">
           <div className="prose max-w-none">
             <p>{ticket.description}</p>
+          </div>
+        </div>
+
+        {/* File Attachments Section */}
+        <div className="mt-6 border-t border-gray-200 pt-6">
+          <h4 className="text-lg font-medium text-gray-900 mb-4">Attachments</h4>
+          <div className="space-y-4">
+            {/* File List */}
+            <div className="space-y-2">
+              {files.map((file) => (
+                <div key={file.id} className="flex items-center justify-between bg-gray-50 px-4 py-3 rounded-md">
+                  <div className="flex items-center flex-1 min-w-0">
+                    <Upload className="h-5 w-5 text-gray-400 mr-3" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {file.filename}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {file.uploader?.full_name} • {new Date(file.created_at).toLocaleDateString()} • 
+                        {(file.size_bytes / 1024).toFixed(1)} KB
+                      </p>
+                    </div>
+                  </div>
+                  <div className="ml-4 flex-shrink-0 flex space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => handleFileDownload(file)}
+                      className="text-primary hover:text-primary-dark"
+                      title="Download"
+                    >
+                      <Download className="h-5 w-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleFileDelete(file.id)}
+                      className="text-red-500 hover:text-red-700"
+                      title="Delete"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Upload Button */}
+            <div className="flex items-center justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+              <div className="space-y-1 text-center">
+                <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                <div className="flex text-sm text-gray-600">
+                  <label
+                    htmlFor="ticket-file-upload"
+                    className="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary-dark focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary"
+                  >
+                    <span>Upload files</span>
+                    <input
+                      id="ticket-file-upload"
+                      name="ticket-file-upload"
+                      type="file"
+                      multiple
+                      className="sr-only"
+                      onChange={handleFileUpload}
+                      disabled={uploading}
+                    />
+                  </label>
+                  <p className="pl-1">or drag and drop</p>
+                </div>
+                <p className="text-xs text-gray-500">
+                  {uploading ? 'Uploading...' : 'Any file up to 10MB'}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
