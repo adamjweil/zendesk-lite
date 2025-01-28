@@ -1,6 +1,7 @@
 import { Pinecone } from '@pinecone-database/pinecone'
 import OpenAI from 'openai'
 import { supabase } from './supabase'
+import { Langfuse } from 'langfuse'
 
 // Polyfill for browser environment
 if (typeof global === 'undefined') {
@@ -18,12 +19,43 @@ const pc = new Pinecone({
 
 const index = pc.index(import.meta.env.VITE_PINECONE_INDEX_NAME)
 
+// Initialize Langfuse client
+const langfuse = new Langfuse({
+  publicKey: import.meta.env.VITE_LANGFUSE_PUBLIC_KEY,
+  secretKey: import.meta.env.VITE_LANGFUSE_SECRET_KEY,
+  baseUrl: import.meta.env.VITE_LANGFUSE_BASE_URL // optional, defaults to cloud
+})
+
 const generateEmbedding = async (text) => {
-  const response = await openai.embeddings.create({
-    model: 'text-embedding-ada-002',
-    input: text,
-  })
-  return response.data[0].embedding
+  const trace = langfuse.trace({
+    name: 'generate_embedding',
+    input: { text }
+  });
+
+  const span = trace.span({
+    name: 'openai_embedding',
+    input: { text, model: 'text-embedding-ada-002' }
+  });
+
+  try {
+    const response = await openai.embeddings.create({
+      model: 'text-embedding-ada-002',
+      input: text,
+    });
+    
+    span.end({
+      output: { embedding_length: response.data[0].embedding.length },
+      status: 'success'
+    });
+    
+    return response.data[0].embedding;
+  } catch (error) {
+    span.end({
+      status: 'error',
+      statusMessage: error.message
+    });
+    throw error;
+  }
 }
 
 // Add timestamp tracking
@@ -153,59 +185,84 @@ export const syncDataToPinecone = async () => {
 }
 
 const analyzeQuery = async (query) => {
-  const response = await openai.chat.completions.create({
-    model: 'gpt-3.5-turbo',
-    messages: [
-      {
-        role: 'system',
-        content: `You are a helpful assistant that analyzes user queries about ticket data. 
-        Determine the type of analysis needed and what visualization would be most appropriate.
-        
-        Query types:
-        - For queries about counts or numbers, use 'count' type
-        - For queries about changes over time, use 'trend' type
-        - For queries about distribution across categories, use 'distribution' type
-        - For queries about listing or showing specific tickets, use 'list' type
-        - For queries about assignments or tickets assigned to someone, use 'list' type
-        
-        Pay special attention to:
-        - Queries about assignments:
-          * "assigned to me" or "my tickets" -> assignedTo: "me"
-          * "assigned to [name]" -> assignedTo: "[name]" (e.g., "Bill" -> "bill")
-        - Time-based queries:
-          * "today", "completed today", "closed today" -> timeRange: "day", status: "closed"
-          * "yesterday" -> timeRange: "day" (for previous day)
-        - Status queries:
-          * "completed", "closed" -> status: "closed"
-          * "open tickets", "active tickets" -> status: "open"
-        - Priority queries (e.g., "high priority", "urgent tickets")
-        
-        Return a JSON object with the following structure:
-        {
-          "queryType": "count" | "trend" | "distribution" | "list" | "search",
-          "filters": {
-            "status": string | null,
-            "priority": string | null,
-            "timeRange": "day" | "week" | "month" | "year" | null,
-            "assignedTo": "me" | string | null
-          },
-          "visualization": "none" | "bar" | "line" | "pie"
-        }
-        
-        Example queries and responses:
-        "How many tickets were completed today?" -> { queryType: "count", filters: { status: "closed", timeRange: "day" } }
-        "Show my tickets" -> { queryType: "list", filters: { assignedTo: "me" } }
-        "How many tickets are assigned to Bill?" -> { queryType: "list", filters: { assignedTo: "bill" } }`
-      },
-      {
-        role: 'user',
-        content: query
-      }
-    ],
-    response_format: { type: 'json_object' }
-  })
+  const trace = langfuse.trace({
+    name: 'analyze_query',
+    input: { query }
+  });
 
-  return JSON.parse(response.choices[0].message.content)
+  const span = trace.span({
+    name: 'query_analysis',
+    input: { query }
+  });
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a helpful assistant that analyzes user queries about ticket data. 
+          Determine the type of analysis needed and what visualization would be most appropriate.
+          
+          Query types:
+          - For queries about counts or numbers, use 'count' type
+          - For queries about changes over time, use 'trend' type
+          - For queries about distribution across categories, use 'distribution' type
+          - For queries about listing or showing specific tickets, use 'list' type
+          - For queries about assignments or tickets assigned to someone, use 'list' type
+          
+          Pay special attention to:
+          - Queries about assignments:
+            * "assigned to me" or "my tickets" -> assignedTo: "me"
+            * "assigned to [name]" -> assignedTo: "[name]" (e.g., "Bill" -> "bill")
+          - Time-based queries:
+            * "today", "completed today", "closed today" -> timeRange: "day", status: "closed"
+            * "yesterday" -> timeRange: "day" (for previous day)
+          - Status queries:
+            * "completed", "closed" -> status: "closed"
+            * "open tickets", "active tickets" -> status: "open"
+          - Priority queries (e.g., "high priority", "urgent tickets")
+          
+          Return a JSON object with the following structure:
+          {
+            "queryType": "count" | "trend" | "distribution" | "list" | "search",
+            "filters": {
+              "status": string | null,
+              "priority": string | null,
+              "timeRange": "day" | "week" | "month" | "year" | null,
+              "assignedTo": "me" | string | null
+            },
+            "visualization": "none" | "bar" | "line" | "pie"
+          }
+          
+          Example queries and responses:
+          "How many tickets were completed today?" -> { queryType: "count", filters: { status: "closed", timeRange: "day" } }
+          "Show my tickets" -> { queryType: "list", filters: { assignedTo: "me" } }
+          "How many tickets are assigned to Bill?" -> { queryType: "list", filters: { assignedTo: "bill" } }`
+        },
+        {
+          role: 'user',
+          content: query
+        }
+      ],
+      response_format: { type: 'json_object' }
+    });
+
+    const result = JSON.parse(response.choices[0].message.content);
+    
+    span.end({
+      output: result,
+      status: 'success'
+    });
+    
+    return result;
+  } catch (error) {
+    span.end({
+      status: 'error',
+      statusMessage: error.message
+    });
+    throw error;
+  }
 }
 
 const processQueryResults = async (results, analysis) => {
@@ -421,30 +478,53 @@ const processQueryResults = async (results, analysis) => {
 }
 
 export const processMessage = async (message) => {
+  const trace = langfuse.trace({
+    name: 'process_message',
+    input: { message }
+  });
+
   try {
-    // First, analyze the query to understand what kind of response is needed
-    const analysis = await analyzeQuery(message)
+    const analysis = await analyzeQuery(message);
+    
+    const querySpan = trace.span({
+      name: 'pinecone_query',
+      input: { message }
+    });
 
-    // Generate an embedding for the query
-    const queryEmbedding = await generateEmbedding(message)
-
-    // Search Pinecone
+    const queryEmbedding = await generateEmbedding(message);
     const queryResponse = await index.query({
       vector: queryEmbedding,
-      topK: 100, // Increased to get better coverage
+      topK: 100,
       includeMetadata: true
-    })
+    });
 
-    // Process the results based on the analysis
-    return await processQueryResults(queryResponse.matches, analysis)
+    querySpan.end({
+      output: {
+        matches_count: queryResponse.matches.length
+      },
+      status: 'success'
+    });
+
+    const result = await processQueryResults(queryResponse.matches, analysis);
+    
+    trace.update({
+      output: result,
+      status: 'success'
+    });
+
+    return result;
   } catch (error) {
-    console.error('Error processing message:', error)
+    trace.update({
+      status: 'error',
+      statusMessage: error.message
+    });
+    
     return {
       text: 'Sorry, I encountered an error processing your request.',
       data: null,
       visualType: null,
       isHTML: false
-    }
+    };
   }
 }
 
