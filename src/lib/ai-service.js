@@ -1,10 +1,18 @@
 import { Pinecone } from '@pinecone-database/pinecone'
 import OpenAI from 'openai'
 import { supabase } from './supabase'
+import { langfuse } from './langfuse'
 
 // Polyfill for browser environment
 if (typeof global === 'undefined') {
-  globalThis.global = globalThis;
+  const global = globalThis;
+  Object.defineProperty(window, 'global', {
+    get: function() {
+      return global;
+    },
+    configurable: true,
+    enumerable: true
+  });
 }
 
 const openai = new OpenAI({
@@ -153,59 +161,101 @@ export const syncDataToPinecone = async () => {
 }
 
 const analyzeQuery = async (query) => {
-  const response = await openai.chat.completions.create({
-    model: 'gpt-3.5-turbo',
-    messages: [
-      {
-        role: 'system',
-        content: `You are a helpful assistant that analyzes user queries about ticket data. 
-        Determine the type of analysis needed and what visualization would be most appropriate.
-        
-        Query types:
-        - For queries about counts or numbers, use 'count' type
-        - For queries about changes over time, use 'trend' type
-        - For queries about distribution across categories, use 'distribution' type
-        - For queries about listing or showing specific tickets, use 'list' type
-        - For queries about assignments or tickets assigned to someone, use 'list' type
-        
-        Pay special attention to:
-        - Queries about assignments:
-          * "assigned to me" or "my tickets" -> assignedTo: "me"
-          * "assigned to [name]" -> assignedTo: "[name]" (e.g., "Bill" -> "bill")
-        - Time-based queries:
-          * "today", "completed today", "closed today" -> timeRange: "day", status: "closed"
-          * "yesterday" -> timeRange: "day" (for previous day)
-        - Status queries:
-          * "completed", "closed" -> status: "closed"
-          * "open tickets", "active tickets" -> status: "open"
-        - Priority queries (e.g., "high priority", "urgent tickets")
-        
-        Return a JSON object with the following structure:
-        {
-          "queryType": "count" | "trend" | "distribution" | "list" | "search",
-          "filters": {
-            "status": string | null,
-            "priority": string | null,
-            "timeRange": "day" | "week" | "month" | "year" | null,
-            "assignedTo": "me" | string | null
-          },
-          "visualization": "none" | "bar" | "line" | "pie"
-        }
-        
-        Example queries and responses:
-        "How many tickets were completed today?" -> { queryType: "count", filters: { status: "closed", timeRange: "day" } }
-        "Show my tickets" -> { queryType: "list", filters: { assignedTo: "me" } }
-        "How many tickets are assigned to Bill?" -> { queryType: "list", filters: { assignedTo: "bill" } }`
-      },
-      {
-        role: 'user',
-        content: query
-      }
-    ],
-    response_format: { type: 'json_object' }
-  })
+  const trace = langfuse.trace({
+    name: 'analyze_query',
+    input: { query },
+    metadata: {
+      queryLength: query.length,
+      queryType: 'user_input'
+    }
+  });
 
-  return JSON.parse(response.choices[0].message.content)
+  const span = trace.span({
+    name: 'query_analysis',
+    input: { query }
+  });
+
+  try {
+    const startTime = Date.now();
+    const response = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a helpful assistant that analyzes user queries about ticket data. 
+          Determine the type of analysis needed and what visualization would be most appropriate.
+          
+          Query types:
+          - For queries about counts or numbers, use 'count' type
+          - For queries about changes over time, use 'trend' type
+          - For queries about distribution across categories, use 'distribution' type
+          - For queries about listing or showing specific tickets, use 'list' type
+          - For queries about assignments or tickets assigned to someone, use 'list' type
+          
+          Pay special attention to:
+          - Time-based queries:
+            * "today", "completed today", "closed today" -> timeRange: "day", status: "closed"
+            * "yesterday", "closed yesterday" -> timeRange: "yesterday", status: "closed"
+            * "last week" -> timeRange: "week"
+          - Status queries:
+            * "completed", "closed" -> status: "closed"
+            * "open tickets", "active tickets" -> status: "open"
+          - Assignment queries:
+            * "assigned to me" or "my tickets" -> assignedTo: "me"
+            * "assigned to [name]" -> assignedTo: "[name]"
+          - Priority queries (e.g., "high priority", "urgent tickets")
+          
+          Return a JSON object with the following structure:
+          {
+            "queryType": "count" | "trend" | "distribution" | "list" | "search",
+            "filters": {
+              "status": string | null,
+              "priority": string | null,
+              "timeRange": "day" | "yesterday" | "week" | "month" | "year" | null,
+              "assignedTo": "me" | string | null
+            },
+            "visualization": "none" | "bar" | "line" | "pie"
+          }
+          
+          Example queries and responses:
+          "How many tickets were closed yesterday?" -> { queryType: "count", filters: { status: "closed", timeRange: "yesterday" } }
+          "Show tickets closed today" -> { queryType: "list", filters: { status: "closed", timeRange: "day" } }
+          "How many tickets were completed last week?" -> { queryType: "count", filters: { status: "closed", timeRange: "week" } }`
+        },
+        {
+          role: 'user',
+          content: query
+        }
+      ],
+      response_format: { type: 'json_object' }
+    });
+    const endTime = Date.now();
+
+    const result = JSON.parse(response.choices[0].message.content);
+    
+    span.end({
+      output: result,
+      status: 'success',
+      metadata: {
+        processingTimeMs: endTime - startTime,
+        tokenCount: response.usage.total_tokens,
+        queryType: result.queryType,
+        hasFilters: Object.keys(result.filters || {}).length > 0
+      }
+    });
+    
+    return result;
+  } catch (error) {
+    span.end({
+      status: 'error',
+      statusMessage: error.message,
+      metadata: {
+        errorType: error.name,
+        errorStack: error.stack
+      }
+    });
+    throw error;
+  }
 }
 
 const processQueryResults = async (results, analysis) => {
@@ -214,15 +264,53 @@ const processQueryResults = async (results, analysis) => {
   const filteredResults = results.filter(r => r.metadata.type === 'ticket')
 
   // Helper function to create ticket link
-  const createTicketLink = (ticket) => {
+  const createTicketLink = async (ticket) => {
     const priorityEmoji = {
       urgent: '🔴',
       high: '🟠',
       medium: '🟡',
       low: '🟢'
     }[ticket.metadata.priority.toLowerCase()] || '⚪️'
+
+    // Get assignee name if ticket is assigned
+    let assigneeName = 'Unassigned';
+    if (ticket.metadata.assigned_to) {
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', ticket.metadata.assigned_to)
+          .single();
+        
+        if (profile?.full_name) {
+          assigneeName = profile.full_name;
+        }
+      } catch (error) {
+        console.error('Error fetching assignee name:', error);
+      }
+    }
+
+    const statusColors = {
+      open: 'text-green-600',
+      closed: 'text-gray-600',
+      pending: 'text-yellow-600',
+      'in progress': 'text-blue-600'
+    };
     
-    return `<a href="/tickets/${ticket.metadata.id}" target="_blank" class="text-primary hover:underline">${ticket.metadata.subject}</a> ${priorityEmoji} (${ticket.metadata.status})`
+    const statusColor = statusColors[ticket.metadata.status.toLowerCase()] || 'text-gray-600';
+    
+    return `<span class="flex items-center gap-2">
+      <span class="flex-shrink-0">${priorityEmoji}</span>
+      <a href="/tickets/${ticket.metadata.id}" target="_blank" class="text-primary hover:underline font-medium">${ticket.metadata.subject}</a>
+      <span class="${statusColor} font-medium">(${ticket.metadata.status})</span>
+      <span class="text-gray-500">•</span>
+      <span class="flex items-center gap-1 text-gray-500">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+        ${assigneeName}
+      </span>
+    </span>`;
   }
 
   // Helper function to check if a date is yesterday
@@ -249,10 +337,47 @@ const processQueryResults = async (results, analysis) => {
   const { data: { user } } = await supabase.auth.getUser()
   const currentUserId = user?.id
 
+  console.log('Debug - Current User:', {
+    currentUserId,
+    userObject: user
+  });
+
   // Helper function to check if a ticket is assigned to a specific user
   const isAssignedToUser = async (ticket, targetUser) => {
+    // Debug - Log the incoming ticket data
+    console.log('Debug - Checking ticket assignment:', {
+      ticketId: ticket.metadata.id,
+      ticketStatus: ticket.metadata.status,
+      rawAssignedTo: ticket.metadata.assigned_to,
+      targetUser,
+      currentUserId
+    });
+
+    if (!ticket.metadata.assigned_to) {
+      console.log(`Debug - Ticket ${ticket.metadata.id} has no assignment`);
+      return false;
+    }
+    
     if (targetUser === 'me') {
-      return ticket.metadata.assigned_to === currentUserId
+      // Convert both IDs to strings for comparison
+      const assignedToStr = String(ticket.metadata.assigned_to);
+      const currentUserIdStr = String(currentUserId);
+      
+      const matches = assignedToStr === currentUserIdStr;
+      
+      // Debug logging for 'me' assignment check
+      console.log('Debug - Checking assignment to current user:', {
+        ticketId: ticket.metadata.id,
+        assignedToType: typeof ticket.metadata.assigned_to,
+        assignedToValue: ticket.metadata.assigned_to,
+        currentUserIdType: typeof currentUserId,
+        currentUserIdValue: currentUserId,
+        assignedToStr,
+        currentUserIdStr,
+        matches
+      });
+      
+      return matches;
     }
 
     try {
@@ -260,22 +385,29 @@ const processQueryResults = async (results, analysis) => {
       const { data: users, error } = await supabase
         .from('profiles')
         .select('id, full_name')
-        .ilike('full_name', targetUser)
-        .limit(1)
+        .ilike('full_name', `%${targetUser}%`)
+        .limit(1);
 
-      if (error) throw error
+      if (error) throw error;
       
       if (users && users.length > 0) {
-        const userId = users[0].id
-        return ticket.metadata.assigned_to === userId
+        const userId = users[0].id;
+        // Debug logging for name-based assignment check
+        console.log('Checking assignment by name:', {
+          ticketId: ticket.metadata.id,
+          assignedTo: ticket.metadata.assigned_to,
+          lookedUpUserId: userId,
+          matches: ticket.metadata.assigned_to === userId
+        });
+        return ticket.metadata.assigned_to === userId;
       }
       
-      return false
+      return false;
     } catch (error) {
-      console.error('Error looking up user:', error)
-      return false
+      console.error('Error looking up user:', error);
+      return false;
     }
-  }
+  };
 
   switch (analysis.queryType) {
     case 'count':
@@ -285,32 +417,70 @@ const processQueryResults = async (results, analysis) => {
       // Debug logging
       console.log('Total tickets before filtering:', filteredResults.length)
       console.log('Analysis:', analysis)
+      console.log('Current user ID:', currentUserId)
       console.log('Raw tickets:', filteredResults.map(t => ({
         id: t.metadata.id,
         status: t.metadata.status,
+        assigned_to: t.metadata.assigned_to,
         updated_at: t.metadata.updated_at,
         created_at: t.metadata.created_at
       })))
       
       // Apply time-based filters
-      if (analysis.filters?.timeRange === 'day') {
+      if (analysis.filters?.timeRange) {
         const today = new Date()
+        const yesterday = new Date(today)
+        yesterday.setDate(yesterday.getDate() - 1)
         today.setHours(0, 0, 0, 0)
+        yesterday.setHours(0, 0, 0, 0)
         
         filteredTickets = filteredTickets.filter(t => {
-          const ticketDate = new Date(t.metadata.updated_at || t.metadata.created_at)
-          ticketDate.setHours(0, 0, 0, 0)
-          const isToday = ticketDate.getTime() === today.getTime()
+          // Get the relevant date based on the query context
+          let relevantDate;
+          if (analysis.filters?.status === 'closed') {
+            // For closed tickets, use the last_updated timestamp as the closing time
+            relevantDate = new Date(t.metadata.updated_at || t.metadata.created_at)
+          } else {
+            // For other queries, use created_at
+            relevantDate = new Date(t.metadata.created_at)
+          }
+          relevantDate.setHours(0, 0, 0, 0)
+
+          // Check if the date matches today or yesterday based on the query
+          const isToday = relevantDate.getTime() === today.getTime()
+          const isYesterday = relevantDate.getTime() === yesterday.getTime()
+          
           console.log(`Ticket ${t.metadata.id} date check:`, {
-            ticketDate,
+            relevantDate,
             today,
+            yesterday,
             isToday,
+            isYesterday,
+            status: t.metadata.status,
             updated_at: t.metadata.updated_at,
-            created_at: t.metadata.created_at
+            created_at: t.metadata.created_at,
+            timeRange: analysis.filters.timeRange
           })
-          return isToday
+
+          // Return based on the timeRange filter
+          switch (analysis.filters.timeRange) {
+            case 'yesterday':
+              return isYesterday;
+            case 'day':
+              return isToday;
+            default:
+              return false;
+          }
         })
-        console.log('Tickets after time filter:', filteredTickets.length)
+        console.log('Tickets after time filter:', {
+          count: filteredTickets.length,
+          timeRange: analysis.filters.timeRange,
+          tickets: filteredTickets.map(t => ({
+            id: t.metadata.id,
+            status: t.metadata.status,
+            updated_at: t.metadata.updated_at
+          }))
+        })
       }
       
       // Apply status filter
@@ -331,19 +501,40 @@ const processQueryResults = async (results, analysis) => {
       
       // Apply assignment filter
       if (analysis.filters?.assignedTo) {
-        console.log('Filtering by assignment:', analysis.filters.assignedTo)
-        // Since isAssignedToUser is now async, we need to use Promise.all
-        filteredTickets = await Promise.all(
-          filteredTickets.map(async t => ({
-            ticket: t,
-            isAssigned: await isAssignedToUser(t, analysis.filters.assignedTo)
+        console.log('Debug - Starting assignment filtering:', {
+          filterType: analysis.filters.assignedTo,
+          totalTicketsBeforeFilter: filteredTickets.length,
+          currentUserId
+        });
+        
+        // Use Promise.all to handle async filtering
+        const assignmentResults = await Promise.all(
+          filteredTickets.map(async t => {
+            const isAssigned = await isAssignedToUser(t, analysis.filters.assignedTo);
+            console.log(`Debug - Assignment check result for ticket ${t.metadata.id}:`, {
+              isAssigned,
+              status: t.metadata.status,
+              assigned_to: t.metadata.assigned_to
+            });
+            return {
+              ticket: t,
+              isAssigned
+            };
+          })
+        );
+        
+        filteredTickets = assignmentResults
+          .filter(r => r.isAssigned)
+          .map(r => r.ticket);
+          
+        console.log('Debug - Assignment filtering complete:', {
+          totalTicketsAfterFilter: filteredTickets.length,
+          remainingTickets: filteredTickets.map(t => ({
+            id: t.metadata.id,
+            status: t.metadata.status,
+            assigned_to: t.metadata.assigned_to
           }))
-        ).then(results => 
-          results
-            .filter(r => r.isAssigned)
-            .map(r => r.ticket)
-        )
-        console.log('Tickets after assignment filter:', filteredTickets.length)
+        });
       }
       
       // Apply other filters
@@ -363,25 +554,39 @@ const processQueryResults = async (results, analysis) => {
 
       if (filteredTickets.length === 0) {
         if (analysis.filters?.assignedTo) {
-          const assignee = analysis.filters.assignedTo === 'me' ? 'you' : analysis.filters.assignedTo
-          text = `No tickets are currently assigned to ${assignee}.`
+          const assignee = analysis.filters.assignedTo === 'me' ? 'you' : analysis.filters.assignedTo;
+          text = `No tickets are currently assigned to ${assignee}.`;
+        } else if (analysis.filters?.timeRange === 'yesterday' && analysis.filters?.status === 'closed') {
+          text = 'No tickets were closed yesterday.';
         } else {
-          text = 'No tickets match your query.'
+          text = 'No tickets match your query.';
         }
       } else {
-        const assignee = analysis.filters?.assignedTo === 'me' ? 'you' : analysis.filters.assignedTo
-        const assignmentContext = analysis.filters?.assignedTo ? ` assigned to ${assignee}` : ''
-        const timeContext = analysis.filters?.timeRange === 'day' ? ' created yesterday' : ''
+        const assignee = analysis.filters?.assignedTo === 'me' ? 'you' : analysis.filters.assignedTo;
+        const assignmentContext = analysis.filters?.assignedTo ? ` assigned to ${assignee}` : '';
+        let timeContext = '';
         
-        if (analysis.queryType === 'count') {
-          text = `${filteredTickets.length} ticket${filteredTickets.length === 1 ? ' is' : 's are'} currently${assignmentContext}:`
-        } else {
-          text = `Here are ${filteredTickets.length} tickets${timeContext}${assignmentContext}:`
+        if (analysis.filters?.timeRange === 'yesterday') {
+          timeContext = ' closed yesterday';
+        } else if (analysis.filters?.timeRange === 'day') {
+          timeContext = ' created today';
         }
         
-        filteredTickets.forEach(ticket => {
-          text += `\n- ${createTicketLink(ticket)} - Created ${formatRelativeDate(ticket.metadata.created_at)}`
-        })
+        if (analysis.queryType === 'count') {
+          text = `${filteredTickets.length} ticket${filteredTickets.length === 1 ? ' was' : 's were'}${timeContext}${assignmentContext}:`;
+        } else {
+          text = `Here are ${filteredTickets.length} tickets${timeContext}${assignmentContext}:`;
+        }
+        
+        // Create ticket links with assignee info
+        const ticketLinks = await Promise.all(
+          filteredTickets.map(async ticket => {
+            const link = await createTicketLink(ticket);
+            return `\n- ${link} - Created ${formatRelativeDate(ticket.metadata.created_at)}`;
+          })
+        );
+        
+        text += ticketLinks.join('');
       }
       break
 
@@ -395,6 +600,7 @@ const processQueryResults = async (results, analysis) => {
       data = Object.entries(grouped)
         .sort((a, b) => new Date(a[0]) - new Date(b[0]))
         .map(([name, value]) => ({ name, value }))
+
       break
 
     case 'distribution':
@@ -450,33 +656,26 @@ export const processMessage = async (message) => {
 
 // Update setupRealtimeSync to track changes
 export const setupRealtimeSync = () => {
+  const handleChange = async (payload) => {
+    console.log('Change detected:', payload)
+    // Only invalidate the timestamp if it's a relevant change
+    if (payload.new && payload.new !== payload.old) {
+      lastUpdateTimestamp = null
+      localStorage.removeItem('lastSyncTime')
+    }
+  }
+
   const channel = supabase
     .channel('schema-db-changes')
     .on(
       'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'tickets'
-      },
-      async (payload) => {
-        console.log('Ticket change detected:', payload)
-        // Mark that we have changes
-        lastUpdateTimestamp = null
-      }
+      { event: '*', schema: 'public', table: 'tickets' },
+      handleChange
     )
     .on(
       'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'comments'
-      },
-      async (payload) => {
-        console.log('Comment change detected:', payload)
-        // Mark that we have changes
-        lastUpdateTimestamp = null
-      }
+      { event: '*', schema: 'public', table: 'comments' },
+      handleChange
     )
     .subscribe()
 
@@ -488,16 +687,331 @@ export const setupRealtimeSync = () => {
 // Update forceSync to be smarter
 export const forceSync = async () => {
   console.log('Checking if sync needed...')
+  
+  // If we have a lastUpdateTimestamp and it's within the last 5 minutes, skip sync
+  if (lastUpdateTimestamp) {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
+    if (new Date(lastUpdateTimestamp) > fiveMinutesAgo) {
+      console.log('Sync skipped - data is recent')
+      return { success: true, skipped: true }
+    }
+  }
+
   try {
     const result = await syncDataToPinecone()
-    if (result.skipped) {
-      console.log('Sync skipped - no new changes')
-    } else {
-      console.log('Sync completed')
-    }
     return result
   } catch (error) {
     console.error('Error during sync:', error)
     throw error
   }
+}
+
+const testQueries = [
+  "Show all high priority tickets",
+  "How many tickets were created today?",
+  "What's the trend of tickets over the last week?",
+  "Show me tickets assigned to John",
+  "List all urgent tickets that are still open"
+];
+
+async function runQueryTests() {
+  const trace = langfuse.trace({
+    name: 'query_test_suite',
+    metadata: {
+      testType: 'query_coverage',
+      timestamp: new Date().toISOString()
+    }
+  });
+
+  for (const query of testQueries) {
+    const querySpan = trace.span({
+      name: 'test_query',
+      input: { query }
+    });
+
+    try {
+      const result = await processMessage(query);
+      querySpan.end({
+        status: 'success',
+        output: result,
+        metadata: {
+          hasResults: result.data !== null,
+          isHTML: result.isHTML,
+          visualType: result.visualType
+        }
+      });
+    } catch (error) {
+      querySpan.end({
+        status: 'error',
+        statusMessage: error.message
+      });
+    }
+  }
+}
+
+const validateResults = (result, expectedResults) => {
+  if (!result || !result.data) {
+    return false;
+  }
+
+  // Check minimum results
+  if (expectedResults.minResults && result.data.length < expectedResults.minResults) {
+    return false;
+  }
+
+  // Check priority
+  if (expectedResults.shouldContainPriority) {
+    const hasPriority = result.data.some(
+      item => item.metadata?.priority?.toLowerCase() === expectedResults.shouldContainPriority.toLowerCase()
+    );
+    if (!hasPriority) return false;
+  }
+
+  // Check status
+  if (expectedResults.status) {
+    const hasStatus = result.data.some(
+      item => item.metadata?.status?.toLowerCase() === expectedResults.status.toLowerCase()
+    );
+    if (!hasStatus) return false;
+  }
+
+  // Check timeframe (this is a basic check, you might want to make it more sophisticated)
+  if (expectedResults.timeframe === "today") {
+    const today = new Date().toISOString().split('T')[0];
+    const hasToday = result.data.some(
+      item => item.metadata?.created_at?.startsWith(today)
+    );
+    if (!hasToday) return false;
+  }
+
+  return true;
+};
+
+const calculateCosineSimilarity = (vec1, vec2) => {
+  const dotProduct = vec1.reduce((acc, val, i) => acc + val * vec2[i], 0);
+  const mag1 = Math.sqrt(vec1.reduce((acc, val) => acc + val * val, 0));
+  const mag2 = Math.sqrt(vec2.reduce((acc, val) => acc + val * val, 0));
+  return dotProduct / (mag1 * mag2);
+};
+
+const testQueryPerformance = async () => {
+  const trace = langfuse.trace({
+    name: 'query_performance_test',
+    metadata: {
+      testType: 'performance',
+      timestamp: new Date().toISOString()
+    }
+  });
+
+  const testQueries = [
+    {
+      query: "Show high priority tickets",
+      expectedResults: {
+        minResults: 1,
+        shouldContainPriority: "high"
+      }
+    },
+    {
+      query: "Show tickets created today",
+      expectedResults: {
+        timeframe: "today"
+      }
+    },
+    {
+      query: "Show urgent open tickets",
+      expectedResults: {
+        status: "open",
+        priority: "urgent"
+      }
+    }
+  ];
+
+  for (const test of testQueries) {
+    const querySpan = trace.span({
+      name: 'performance_test',
+      input: test
+    });
+
+    const startTime = Date.now();
+    try {
+      const result = await processMessage(test.query);
+      const duration = Date.now() - startTime;
+
+      querySpan.end({
+        status: 'success',
+        output: {
+          responseTime: duration,
+          hasData: !!result.data,
+          resultCount: result.data?.length || 0
+        },
+        metadata: {
+          meetsExpectations: validateResults(result, test.expectedResults),
+          responseTimeMs: duration
+        }
+      });
+    } catch (error) {
+      querySpan.end({
+        status: 'error',
+        statusMessage: error.message
+      });
+    }
+  }
+};
+
+const testEmbeddingQuality = async () => {
+  const trace = langfuse.trace({
+    name: 'embedding_quality_test',
+    metadata: {
+      testType: 'semantic_search'
+    }
+  });
+
+  const similarityTests = [
+    {
+      baseQuery: "urgent tickets",
+      similarQueries: [
+        "high priority issues",
+        "critical tickets",
+        "emergency tasks"
+      ]
+    },
+    {
+      baseQuery: "tickets assigned to John",
+      similarQueries: [
+        "John's tasks",
+        "what is John working on",
+        "show John's tickets"
+      ]
+    }
+  ];
+
+  for (const test of similarityTests) {
+    const testSpan = trace.span({
+      name: 'similarity_test',
+      input: test
+    });
+
+    try {
+      const baseEmbedding = await generateEmbedding(test.baseQuery);
+      const similarResults = [];
+
+      for (const query of test.similarQueries) {
+        const queryEmbedding = await generateEmbedding(query);
+        const similarity = calculateCosineSimilarity(baseEmbedding, queryEmbedding);
+        similarResults.push({ query, similarity });
+      }
+
+      testSpan.end({
+        status: 'success',
+        output: similarResults,
+        metadata: {
+          averageSimilarity: similarResults.reduce((acc, curr) => acc + curr.similarity, 0) / similarResults.length
+        }
+      });
+    } catch (error) {
+      testSpan.end({
+        status: 'error',
+        statusMessage: error.message
+      });
+    }
+  }
+};
+
+const testUserSession = async () => {
+  const sessionTrace = langfuse.trace({
+    name: 'user_session_test',
+    metadata: {
+      testType: 'user_journey'
+    }
+  });
+
+  const userJourney = [
+    "Show all open tickets",
+    "How many high priority tickets are there?",
+    "Show tickets assigned to me",
+    "What's the trend of tickets this week?",
+    "Show distribution of ticket priorities"
+  ];
+
+  let previousResponse = null;
+  
+  for (const query of userJourney) {
+    const querySpan = sessionTrace.span({
+      name: 'journey_step',
+      input: { 
+        query,
+        previousResponse 
+      }
+    });
+
+    try {
+      const result = await processMessage(query);
+      previousResponse = result;
+
+      querySpan.end({
+        status: 'success',
+        output: result,
+        metadata: {
+          hasVisualization: !!result.visualType,
+          responseType: result.visualType || 'text',
+          dataPoints: result.data?.length || 0
+        }
+      });
+    } catch (error) {
+      querySpan.end({
+        status: 'error',
+        statusMessage: error.message
+      });
+    }
+  }
+};
+
+const runComprehensiveTests = async () => {
+  const suiteTrace = langfuse.trace({
+    name: 'comprehensive_test_suite',
+    metadata: {
+      testType: 'full_coverage',
+      timestamp: new Date().toISOString()
+    }
+  });
+
+  try {
+    // Test data sync
+    const syncSpan = suiteTrace.span({ name: 'sync_test' });
+    await forceSync();
+    syncSpan.end({ status: 'success' });
+
+    // Run all tests
+    await Promise.all([
+      testQueryPerformance(),
+      testEmbeddingQuality(),
+      testUserSession()
+    ]);
+
+    suiteTrace.update({
+      status: 'success',
+      metadata: {
+        completedAt: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    suiteTrace.update({
+      status: 'error',
+      statusMessage: error.message
+    });
+  }
+};
+
+export {
+  // processMessage,
+  // syncDataToPinecone,
+  // setupRealtimeSync,
+  // forceSync,
+  generateEmbedding,
+  validateResults,
+  calculateCosineSimilarity,
+  testQueryPerformance,
+  testEmbeddingQuality,
+  testUserSession,
+  runComprehensiveTests
 } 
