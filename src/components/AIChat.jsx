@@ -446,6 +446,24 @@ export default function AIChat({ isOpen, setIsOpen }) {
                     >
                       "How many tickets in open status are assigned to me?"
                     </button>
+                    <button
+                      onClick={() => {
+                        setInput("How many tickets are assigned to the approvers team?")
+                        handleSend()
+                      }}
+                      className="text-left px-2 py-1 text-[10px] text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-md border border-gray-200 transition-colors duration-200 ease-in-out whitespace-nowrap overflow-hidden text-ellipsis italic"
+                    >
+                      "How many tickets are assigned to the approvers team?"
+                    </button>
+                    <button
+                      onClick={() => {
+                        setInput("How many tickets are assigned to members of the approvers team?")
+                        handleSend()
+                      }}
+                      className="text-left px-2 py-1 text-[10px] text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-md border border-gray-200 transition-colors duration-200 ease-in-out whitespace-nowrap overflow-hidden text-ellipsis italic"
+                    >
+                      "How many tickets are assigned to members of the approvers team?"
+                    </button>
                   </div>
 
                   <div className="flex gap-2">
