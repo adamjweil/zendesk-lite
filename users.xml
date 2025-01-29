@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<clickhouse>
+    <users>
+        <default>
+            <password_sha256_hex>f5ca38f748a1d6eaf726b8a42fb575c3c71585e0a3860938fdf677595f1ebc5f</password_sha256_hex>
+            <networks>
+                <ip>0.0.0.0/0</ip>
+            </networks>
+            <profile>default</profile>
+            <quota>default</quota>
+            <access_management>1</access_management>
+        </default>
+    </users>
+
+    <profiles>
+        <default>
+            <allow_experimental_object_type>1</allow_experimental_object_type>
+        </default>
+    </profiles>
+
+    <quotas>
+        <default>
+            <interval>
+                <duration>3600</duration>
+                <queries>0</queries>
+                <errors>0</errors>
+                <result_rows>0</result_rows>
+                <read_rows>0</read_rows>
+                <execution_time>0</execution_time>
+            </interval>
+        </default>
+    </quotas>
+</clickhouse> 

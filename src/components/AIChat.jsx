@@ -16,6 +16,7 @@ import {
   Cell
 } from 'recharts'
 import { processMessage, syncDataToPinecone, setupRealtimeSync, forceSync } from '../lib/ai-service'
+import { runTests } from '../lib/test-runner'
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042']
 
@@ -100,7 +101,11 @@ export default function AIChat({ isOpen, setIsOpen }) {
     setIsLoading(true)
 
     try {
-      await forceSync()
+      // Only force sync if we haven't synced recently
+      if (!localStorage.getItem('lastSyncTime')) {
+        await forceSync()
+      }
+      
       const response = await processMessage(input)
       setMessages(prev => [...prev, {
         role: 'assistant',
@@ -183,8 +188,17 @@ export default function AIChat({ isOpen, setIsOpen }) {
     }
 
     // For assistant messages
+    if (message.isHTML) {
+      return (
+        <div 
+          className="text-xs"
+          dangerouslySetInnerHTML={{ __html: message.content }}
+        />
+      )
+    }
+
+    // For list messages (fallback)
     if (message.content.includes('\n-')) {
-      // This is a list message
       const [intro, ...items] = message.content.split('\n-')
       return (
         <div className="space-y-1.5">
@@ -205,11 +219,7 @@ export default function AIChat({ isOpen, setIsOpen }) {
     }
 
     // Regular message
-    return message.isHTML ? (
-      <div className="text-xs" dangerouslySetInnerHTML={{ __html: message.content }} />
-    ) : (
-      <p className="text-xs">{message.content}</p>
-    )
+    return <p className="text-xs">{message.content}</p>
   }
 
   const formatMessageTime = (timestamp) => {
@@ -236,6 +246,27 @@ export default function AIChat({ isOpen, setIsOpen }) {
 
     const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     return `${dateStr} at ${timeStr}`
+  }
+
+  const handleRunTests = async (testType) => {
+    setIsLoading(true)
+    try {
+      await runTests(testType)
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `${testType} tests completed. Check Langfuse dashboard for results.`,
+        timestamp: new Date().toISOString()
+      }])
+    } catch (error) {
+      console.error('Test error:', error)
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Error running tests. Check console for details.',
+        timestamp: new Date().toISOString()
+      }])
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -405,6 +436,36 @@ export default function AIChat({ isOpen, setIsOpen }) {
                       className="text-left px-2 py-1 text-[10px] text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-md border border-gray-200 transition-colors duration-200 ease-in-out whitespace-nowrap overflow-hidden text-ellipsis italic"
                     >
                       "How many tickets have I closed?"
+                    </button>
+                    <button
+                      onClick={() => {
+                        setInput("How many tickets in open status are assigned to me?")
+                        handleSend()
+                      }}
+                      className="text-left px-2 py-1 text-[10px] text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-md border border-gray-200 transition-colors duration-200 ease-in-out whitespace-nowrap overflow-hidden text-ellipsis italic"
+                    >
+                      "How many tickets in open status are assigned to me?"
+                    </button>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleRunTests('performance')}
+                      className="px-3 py-1.5 text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-md"
+                    >
+                      Run Performance Tests
+                    </button>
+                    <button
+                      onClick={() => handleRunTests('embedding')}
+                      className="px-3 py-1.5 text-sm bg-green-50 text-green-700 hover:bg-green-100 rounded-md"
+                    >
+                      Test Embeddings
+                    </button>
+                    <button
+                      onClick={() => handleRunTests('comprehensive')}
+                      className="px-3 py-1.5 text-sm bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-md"
+                    >
+                      Full Test Suite
                     </button>
                   </div>
                 </div>
