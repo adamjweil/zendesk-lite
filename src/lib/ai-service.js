@@ -203,6 +203,10 @@ const analyzeQuery = async (query) => {
           - Assignment queries:
             * "assigned to me" or "my tickets" -> assignedTo: "me"
             * "assigned to [name]" -> assignedTo: "[name]"
+            * "assigned to [team] team" -> assignedToTeam: "[team]"
+            * "tickets for [team] team" -> assignedToTeam: "[team]"
+            * "assigned to members of [team] team" -> assignedToTeamMembers: "[team]"
+            * "tickets assigned to [team] team members" -> assignedToTeamMembers: "[team]"
           - Priority queries (e.g., "high priority", "urgent tickets")
           
           Return a JSON object with the following structure:
@@ -212,7 +216,9 @@ const analyzeQuery = async (query) => {
               "status": string | null,
               "priority": string | null,
               "timeRange": "day" | "yesterday" | "week" | "month" | "year" | null,
-              "assignedTo": "me" | string | null
+              "assignedTo": "me" | string | null,
+              "assignedToTeam": string | null,
+              "assignedToTeamMembers": string | null
             },
             "visualization": "none" | "bar" | "line" | "pie"
           }
@@ -220,7 +226,8 @@ const analyzeQuery = async (query) => {
           Example queries and responses:
           "How many tickets were closed yesterday?" -> { queryType: "count", filters: { status: "closed", timeRange: "yesterday" } }
           "Show tickets closed today" -> { queryType: "list", filters: { status: "closed", timeRange: "day" } }
-          "How many tickets were completed last week?" -> { queryType: "count", filters: { status: "closed", timeRange: "week" } }`
+          "How many tickets are assigned to the approvers team?" -> { queryType: "count", filters: { assignedToTeam: "approvers" } }
+          "How many tickets are assigned to members of the approvers team?" -> { queryType: "count", filters: { assignedToTeamMembers: "approvers" } }`
         },
         {
           role: 'user',
@@ -342,6 +349,105 @@ const processQueryResults = async (results, analysis) => {
     userObject: user
   });
 
+  // Helper function to check if a ticket is assigned to a team member
+  const isAssignedToTeamMember = async (ticket, teamName) => {
+    try {
+      // First get the team ID from the team name
+      const { data: teams, error: teamError } = await supabase
+        .from('teams')
+        .select('id, name')
+        .ilike('name', teamName)
+        .limit(1);
+
+      if (teamError || !teams?.length) {
+        console.error('Error fetching team:', teamError);
+        return false;
+      }
+
+      const teamId = teams[0].id;
+
+      // Get all team members
+      const { data: teamMembers, error: membersError } = await supabase
+        .from('team_members')
+        .select('user_id')
+        .eq('team_id', teamId);
+
+      if (membersError) {
+        console.error('Error fetching team members:', membersError);
+        return false;
+      }
+
+      // Check if the ticket is assigned to any team member
+      const isAssignedToMember = teamMembers.some(member => 
+        String(member.user_id) === String(ticket.metadata.assigned_to)
+      );
+
+      console.log('Debug - Team member assignment check:', {
+        ticketId: ticket.metadata.id,
+        teamId,
+        teamMembers: teamMembers.map(m => m.user_id),
+        ticketAssignedTo: ticket.metadata.assigned_to,
+        isAssignedToMember
+      });
+
+      return isAssignedToMember;
+    } catch (error) {
+      console.error('Error checking team member assignment:', error);
+      return false;
+    }
+  };
+
+  // Helper function to check if a ticket is assigned to a specific team
+  const isAssignedToTeam = async (ticket, teamName) => {
+    console.log('Debug - Raw ticket metadata:', {
+      ticketId: ticket.metadata.id,
+      subject: ticket.metadata.subject,
+      allMetadata: ticket.metadata,
+      assigneeType: ticket.metadata.assignee_type,
+      assignedTo: ticket.metadata.assigned_to
+    });
+
+    try {
+      // First get the team ID from the team name
+      const { data: teams, error: teamError } = await supabase
+        .from('teams')
+        .select('id, name')
+        .ilike('name', teamName)
+        .limit(1);
+
+      if (teamError) {
+        console.error('Error fetching team:', teamError);
+        return false;
+      }
+
+      if (!teams || teams.length === 0) {
+        console.log(`No team found with name: ${teamName}`);
+        return false;
+      }
+
+      const teamId = teams[0].id;
+      console.log('Debug - Found team:', { teamName, teamId });
+
+      // Check if the ticket is assigned directly to the team
+      const isTeamAssigned = 
+        ticket.metadata.assignee_type?.toLowerCase() === 'team' && 
+        ticket.metadata.assigned_to === teamId;
+
+      console.log('Debug - Team assignment check:', {
+        ticketId: ticket.metadata.id,
+        teamId,
+        ticketAssigneeType: ticket.metadata.assignee_type,
+        ticketAssignedTo: ticket.metadata.assigned_to,
+        isTeamAssigned
+      });
+
+      return isTeamAssigned;
+    } catch (error) {
+      console.error('Error checking team assignment:', error);
+      return false;
+    }
+  };
+
   // Helper function to check if a ticket is assigned to a specific user
   const isAssignedToUser = async (ticket, targetUser) => {
     // Debug - Log the incoming ticket data
@@ -415,16 +521,15 @@ const processQueryResults = async (results, analysis) => {
       let filteredTickets = [...filteredResults]
       
       // Debug logging
-      console.log('Total tickets before filtering:', filteredResults.length)
-      console.log('Analysis:', analysis)
-      console.log('Current user ID:', currentUserId)
-      console.log('Raw tickets:', filteredResults.map(t => ({
-        id: t.metadata.id,
-        status: t.metadata.status,
-        assigned_to: t.metadata.assigned_to,
-        updated_at: t.metadata.updated_at,
-        created_at: t.metadata.created_at
-      })))
+      console.log('Debug - Initial tickets:', {
+        total: filteredResults.length,
+        tickets: filteredResults.map(t => ({
+          id: t.metadata.id,
+          subject: t.metadata.subject,
+          assigneeType: t.metadata.assignee_type,
+          assignedTo: t.metadata.assigned_to
+        }))
+      });
       
       // Apply time-based filters
       if (analysis.filters?.timeRange) {
@@ -499,6 +604,76 @@ const processQueryResults = async (results, analysis) => {
         console.log('Tickets after status filter:', filteredTickets.length)
       }
       
+      // Apply team member assignment filter
+      if (analysis.filters?.assignedToTeamMembers) {
+        console.log('Debug - Starting team member assignment filtering:', {
+          requestedTeam: analysis.filters.assignedToTeamMembers,
+          totalTicketsBeforeFilter: filteredTickets.length
+        });
+        
+        const teamMemberResults = await Promise.all(
+          filteredTickets.map(async t => {
+            const isAssigned = await isAssignedToTeamMember(t, analysis.filters.assignedToTeamMembers);
+            return {
+              ticket: t,
+              isAssigned,
+              metadata: {
+                id: t.metadata.id,
+                subject: t.metadata.subject,
+                assignedTo: t.metadata.assigned_to
+              }
+            };
+          })
+        );
+        
+        const matchingResults = teamMemberResults.filter(r => r.isAssigned);
+        console.log('Debug - Team member assignment matches:', {
+          totalMatches: matchingResults.length,
+          matches: matchingResults.map(r => r.metadata)
+        });
+        
+        filteredTickets = matchingResults.map(r => r.ticket);
+      }
+      
+      // Apply team assignment filter
+      if (analysis.filters?.assignedToTeam) {
+        console.log('Debug - Starting team assignment filtering:', {
+          requestedTeam: analysis.filters.assignedToTeam,
+          totalTicketsBeforeFilter: filteredTickets.length,
+          ticketsBeforeFilter: filteredTickets.map(t => ({
+            id: t.metadata.id,
+            subject: t.metadata.subject,
+            assigneeType: t.metadata.assignee_type,
+            assignedTo: t.metadata.assigned_to
+          }))
+        });
+        
+        // Use Promise.all to handle async filtering
+        const teamAssignmentResults = await Promise.all(
+          filteredTickets.map(async t => {
+            const isAssigned = await isAssignedToTeam(t, analysis.filters.assignedToTeam);
+            return {
+              ticket: t,
+              isAssigned,
+              metadata: {
+                id: t.metadata.id,
+                subject: t.metadata.subject,
+                assigneeType: t.metadata.assignee_type,
+                assignedTo: t.metadata.assigned_to
+              }
+            };
+          })
+        );
+        
+        const matchingResults = teamAssignmentResults.filter(r => r.isAssigned);
+        console.log('Debug - Team assignment matches:', {
+          totalMatches: matchingResults.length,
+          matches: matchingResults.map(r => r.metadata)
+        });
+        
+        filteredTickets = matchingResults.map(r => r.ticket);
+      }
+      
       // Apply assignment filter
       if (analysis.filters?.assignedTo) {
         console.log('Debug - Starting assignment filtering:', {
@@ -553,7 +728,11 @@ const processQueryResults = async (results, analysis) => {
       })
 
       if (filteredTickets.length === 0) {
-        if (analysis.filters?.assignedTo) {
+        if (analysis.filters?.assignedToTeamMembers) {
+          text = `No tickets are currently assigned to members of the ${analysis.filters.assignedToTeamMembers} team.`;
+        } else if (analysis.filters?.assignedToTeam) {
+          text = `No tickets are currently assigned to the ${analysis.filters.assignedToTeam} team.`;
+        } else if (analysis.filters?.assignedTo) {
           const assignee = analysis.filters.assignedTo === 'me' ? 'you' : analysis.filters.assignedTo;
           text = `No tickets are currently assigned to ${assignee}.`;
         } else if (analysis.filters?.timeRange === 'yesterday' && analysis.filters?.status === 'closed') {
@@ -563,7 +742,15 @@ const processQueryResults = async (results, analysis) => {
         }
       } else {
         const assignee = analysis.filters?.assignedTo === 'me' ? 'you' : analysis.filters.assignedTo;
-        const assignmentContext = analysis.filters?.assignedTo ? ` assigned to ${assignee}` : '';
+        const team = analysis.filters?.assignedToTeam;
+        const teamMembers = analysis.filters?.assignedToTeamMembers;
+        const assignmentContext = teamMembers 
+          ? ` assigned to members of the ${teamMembers} team`
+          : team 
+            ? ` assigned to the ${team} team`
+            : analysis.filters?.assignedTo 
+              ? ` assigned to ${assignee}` 
+              : '';
         let timeContext = '';
         
         if (analysis.filters?.timeRange === 'yesterday') {
