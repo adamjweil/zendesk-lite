@@ -65,6 +65,13 @@ Smart AI-powered assistant for quick ticket inquiries and support automation.
 ![Integrations](./screenshots/integrations1.png)
 Connect with popular third-party services to enhance your support workflow.
 
+## Video Demonstrations
+
+Watch these videos for a complete walkthrough of Zendesk-Lite's features:
+
+- [Part 1: Introduction and Basic Features](https://www.loom.com/share/c501b09d112a4aac8cc2b9a9044a27b6)
+- [Part 2: Advanced Features and Use Cases](https://www.loom.com/share/d6a503891ca1417d9856831ca3ee9b44?sid=efef571a-8896-4a01-b11a-bacdba06d19b)
+
 ## Technical Stack
 
 - **Frontend**: React + Vite
